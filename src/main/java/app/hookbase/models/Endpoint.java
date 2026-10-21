@@ -1,5 +1,6 @@
 package app.hookbase.models;
 
+import app.hookbase.internal.Redact;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,5 +79,11 @@ public record Endpoint(
             if (h != null && h.name() != null) out.put(h.name(), h.value() == null ? "" : h.value());
         }
         return out;
+    }
+
+    /** Credentials are printed as {@code <redacted>}, so logging this record is safe. */
+    @Override
+    public String toString() {
+        return Redact.toString(this, Map.of("secret", Redact.Rule.SECRET));
     }
 }

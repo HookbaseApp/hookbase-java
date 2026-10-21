@@ -187,12 +187,22 @@ class HttpTransportTest {
     @Test
     void postWithIdempotencyKeyOrExplicitRetriesIsRetried() {
         server.enqueue(503, "{}").enqueue(200, "{}");
-        transport().request("POST", "/api/x", null, Map.of(), RequestOptions.builder().idempotencyKey("k").build());
+        transport().request("POST", "/api/send-event", null, Map.of(), RequestOptions.builder().idempotencyKey("k").build());
         assertThat(server.requests()).hasSize(2);
 
         server.enqueue(503, "{}").enqueue(200, "{}");
         transport().request("POST", "/api/x", null, Map.of(), RequestOptions.builder().retries(1).build());
         assertThat(server.requests()).hasSize(4);
+    }
+
+    @Test
+    void idempotencyKeyDoesNotMakeOtherPostsRetryable() {
+        // Only send-event deduplicates on the key; a retried rotate-secret would rotate twice.
+        server.enqueue(502, "{}");
+        assertThatThrownBy(() -> transport().request("POST", "/api/sources/s1/rotate-secret", null, Map.of(),
+                        RequestOptions.builder().idempotencyKey("k").build()))
+                .isInstanceOf(HookbaseApiException.class);
+        assertThat(server.requests()).hasSize(1);
     }
 
     @Test
@@ -205,12 +215,29 @@ class HttpTransportTest {
 
     @Test
     void rateLimitExceptionCarriesRetryAfterWhenRetriesRunOut() {
-        server.enqueue(429, "{\"error\":\"budget\"}");
+        server.enqueue(429, "{\"error\":\"slow down\"}", Map.of("Retry-After", "5"));
         assertThatThrownBy(() -> transport(server.url(), 0, Duration.ofSeconds(5)).request("GET", "/api/x", null, null, null))
                 .isInstanceOfSatisfying(RateLimitException.class, e -> {
-                    assertThat(e.getMessage()).isEqualTo("budget");
-                    assertThat(e.retryAfter()).isEqualTo(Duration.ofSeconds(60));
+                    assertThat(e.getMessage()).isEqualTo("slow down");
+                    assertThat(e.retryAfter()).isEqualTo(Duration.ofSeconds(5));
                 });
+    }
+
+    @Test
+    void quotaRateLimitWithoutRetryAfterIsNotRetried() {
+        server.enqueue(429, "{\"error\":\"Monthly limit exceeded\"}");
+        assertThatThrownBy(() -> transport().request("GET", "/api/x", null, null, null))
+                .isInstanceOfSatisfying(RateLimitException.class, e -> assertThat(e.retryAfter()).isNull());
+        assertThat(server.requests()).hasSize(1);
+        assertThat(sleeps).isEmpty();
+    }
+
+    @Test
+    void retryAfterLongerThanTheCapIsNotWaitedFor() {
+        server.enqueue(429, "{}", Map.of("Retry-After", "9223372036854775807"));
+        assertThatThrownBy(() -> transport().request("GET", "/api/x", null, null, null)).isInstanceOf(RateLimitException.class);
+        assertThat(server.requests()).hasSize(1);
+        assertThat(sleeps).isEmpty();
     }
 
     @Test
@@ -238,9 +265,12 @@ class HttpTransportTest {
 
     @Test
     void parsesRetryAfterForms() {
-        assertThat(HttpTransport.parseRetryAfter(null)).isEqualTo(Duration.ofSeconds(60));
+        assertThat(HttpTransport.parseRetryAfter(null)).isNull();
         assertThat(HttpTransport.parseRetryAfter("3")).isEqualTo(Duration.ofSeconds(3));
-        assertThat(HttpTransport.parseRetryAfter("garbage")).isEqualTo(Duration.ofSeconds(60));
+        assertThat(HttpTransport.parseRetryAfter("garbage")).isNull();
+        assertThat(HttpTransport.parseRetryAfter("-5")).isNull();
+        assertThat(HttpTransport.parseRetryAfter("99999999999999999999")).isNull();
+        assertThat(HttpTransport.parseRetryAfter("999999999")).isEqualTo(Duration.ofDays(1));
         assertThat(HttpTransport.parseRetryAfter("Wed, 21 Oct 2015 07:28:00 GMT")).isEqualTo(Duration.ZERO);
     }
 
@@ -248,6 +278,9 @@ class HttpTransportTest {
     void encodesPathSegments() {
         assertThat(HttpTransport.segment("a/b c")).isEqualTo("a%2Fb%20c");
         assertThatThrownBy(() -> HttpTransport.segment("")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> HttpTransport.segment("..")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> HttpTransport.segment(".")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(HttpTransport.segment("...")).isEqualTo("...");
     }
 
     @Test

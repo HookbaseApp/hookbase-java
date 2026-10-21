@@ -13,7 +13,9 @@ import java.time.Duration;
  * @param retries overrides the client's retry count for this request; {@code null} keeps it.
  *     Setting it explicitly also opts a POST in to retries after a 5xx, timeout or dropped
  *     connection, which are otherwise only retried for a POST that carries an idempotency key
- * @param idempotencyKey sent as the {@code Idempotency-Key} header; makes a POST safe to retry
+ * @param idempotencyKey sent as the {@code Idempotency-Key} header. The API deduplicates on it only
+ *     when sending an event ({@code messages().send()}), so only there does it make a POST safe to
+ *     retry; other endpoints ignore it
  */
 public record RequestOptions(Duration timeout, Integer retries, String idempotencyKey) {
 

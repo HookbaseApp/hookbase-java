@@ -1,6 +1,8 @@
 package app.hookbase.models;
 
+import app.hookbase.internal.Redact;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A token for the embeddable customer portal, scoped to one application.
@@ -19,4 +21,10 @@ public record PortalToken(
         String expiresAt,
         String createdAt,
         Boolean isExpired,
-        Boolean isRevoked) {}
+        Boolean isRevoked) {
+    /** Credentials are printed as {@code <redacted>}, so logging this record is safe. */
+    @Override
+    public String toString() {
+        return Redact.toString(this, Map.of("token", Redact.Rule.SECRET));
+    }
+}

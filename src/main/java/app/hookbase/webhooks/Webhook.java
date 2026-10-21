@@ -16,6 +16,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -31,9 +32,19 @@ import javax.crypto.spec.SecretKeySpec;
  * <pre>{@code
  * Webhook webhook = new Webhook(System.getenv("HOOKBASE_WEBHOOK_SECRET")); // whsec_...
  *
- * // rawBody must be the exact bytes received, before any JSON parsing.
- * JsonNode event = webhook.verify(rawBody, headers);
+ * // Spring: take the body as bytes, exactly as received.
+ * @PostMapping("/webhooks/hookbase")
+ * ResponseEntity<Void> receive(@RequestBody byte[] body, @RequestHeader HttpHeaders headers) {
+ *     JsonNode event = webhook.verify(body, headers.toSingleValueMap());
+ *     ...
+ * }
  * }</pre>
+ *
+ * <p>Verify the raw bytes. A body that was parsed and re-serialized ({@code @RequestBody Map} or
+ * {@code JsonNode}) no longer matches the signature. The {@code String} overloads encode the text as
+ * UTF-8, so they work only when the body was decoded as UTF-8: Hookbase sends {@code
+ * application/json} without a charset, and a Servlet {@code getReader()} then decodes it as
+ * ISO-8859-1, which breaks any non-ASCII body.
  *
  * <p>Instances are immutable and thread-safe.
  */
@@ -43,6 +54,7 @@ public final class Webhook {
     public static final Duration DEFAULT_TOLERANCE = Duration.ofSeconds(300);
 
     private static final Pattern HEX_SECRET = Pattern.compile("^[0-9a-fA-F]{64}$");
+    private static final Pattern TIMESTAMP = Pattern.compile("[0-9]{1,15}");
     private static final String ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -61,11 +73,11 @@ public final class Webhook {
 
     /** As {@link #Webhook(String)}, reading the current time from {@code clock}. For tests. */
     public Webhook(String secret, Clock clock) {
-        if (secret == null || secret.isEmpty()) {
+        if (secret == null || secret.isBlank()) {
             throw new IllegalArgumentException("Webhook secret is required");
         }
-        this.key = decodeSecret(secret);
-        this.clock = clock;
+        this.key = decodeSecret(secret.strip());
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /**
@@ -85,16 +97,36 @@ public final class Webhook {
 
     /** As {@link #verify(String, Map)}, with a custom timestamp tolerance. */
     public JsonNode verify(String payload, Map<String, String> headers, Duration tolerance) {
+        return verify(utf8(payload), headers, tolerance);
+    }
+
+    /** As {@link #verify(String, Map)}, binding the body to {@code type}. */
+    public <T> T verify(String payload, Map<String, String> headers, Class<T> type) {
+        return verify(utf8(payload), headers, type);
+    }
+
+    /**
+     * As {@link #verify(String, Map)}, taking the raw body as bytes: the preferred form. The
+     * signature is checked over the bytes exactly as received, so no charset decoding can change
+     * what was signed.
+     */
+    public JsonNode verify(byte[] payload, Map<String, String> headers) {
+        return verify(payload, headers, DEFAULT_TOLERANCE);
+    }
+
+    /** As {@link #verify(byte[], Map)}, with a custom timestamp tolerance. */
+    public JsonNode verify(byte[] payload, Map<String, String> headers, Duration tolerance) {
         verifyHeaders(payload, headers, tolerance);
         try {
-            return Json.read(payload);
+            return Json.MAPPER.readTree(payload);
         } catch (IOException e) {
             throw new WebhookVerificationException("Invalid JSON payload", e);
         }
     }
 
-    /** As {@link #verify(String, Map)}, binding the body to {@code type}. */
-    public <T> T verify(String payload, Map<String, String> headers, Class<T> type) {
+    /** As {@link #verify(byte[], Map)}, binding the body to {@code type}. */
+    public <T> T verify(byte[] payload, Map<String, String> headers, Class<T> type) {
+        Objects.requireNonNull(type, "type");
         JsonNode node = verify(payload, headers);
         try {
             return Json.MAPPER.treeToValue(node, type);
@@ -104,29 +136,19 @@ public final class Webhook {
     }
 
     /**
-     * As {@link #verify(String, Map)}, taking the raw body as bytes. The signature is checked over
-     * the bytes exactly as received, so no charset decoding can change what was signed.
-     */
-    public JsonNode verify(byte[] payload, Map<String, String> headers) {
-        verifyHeaders(payload, headers, DEFAULT_TOLERANCE);
-        try {
-            return Json.MAPPER.readTree(payload);
-        } catch (IOException e) {
-            throw new WebhookVerificationException("Invalid JSON payload", e);
-        }
-    }
-
-    /**
      * Check the headers, timestamp and signature without parsing the body.
      *
      * @throws WebhookVerificationException if any check fails
      */
     public void verifyHeaders(String payload, Map<String, String> headers, Duration tolerance) {
-        verifyHeaders(payload.getBytes(StandardCharsets.UTF_8), headers, tolerance);
+        verifyHeaders(utf8(payload), headers, tolerance);
     }
 
     /** As {@link #verifyHeaders(String, Map, Duration)}, over the raw body bytes. */
     public void verifyHeaders(byte[] payload, Map<String, String> headers, Duration tolerance) {
+        checkTolerance(tolerance);
+        if (payload == null) throw new WebhookVerificationException("Missing payload");
+        if (headers == null) throw new WebhookVerificationException("Missing webhook headers");
         Map<String, String> normalized = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : headers.entrySet()) {
             if (entry.getKey() != null) normalized.put(entry.getKey().toLowerCase(Locale.ROOT), entry.getValue());
@@ -146,14 +168,20 @@ public final class Webhook {
      * Check a signature header against the payload. Does not check the timestamp's age; use {@link
      * #verify} or {@link #verifyHeaders} for that.
      *
+     * @apiNote Without the timestamp check a captured delivery can be replayed indefinitely. Prefer
+     *     {@link #verify}.
+     *
      * @throws WebhookVerificationException if no {@code v1} signature in the header matches
      */
     public void verifySignature(String payload, String webhookId, String webhookTimestamp, String webhookSignature) {
-        verifySignature(payload.getBytes(StandardCharsets.UTF_8), webhookId, webhookTimestamp, webhookSignature);
+        verifySignature(utf8(payload), webhookId, webhookTimestamp, webhookSignature);
     }
 
     /** As {@link #verifySignature(String, String, String, String)}, over the raw body bytes. */
     public void verifySignature(byte[] payload, String webhookId, String webhookTimestamp, String webhookSignature) {
+        if (payload == null || webhookId == null || webhookTimestamp == null || webhookSignature == null) {
+            throw new WebhookVerificationException("Missing payload or webhook header");
+        }
         byte[] expected = hmac(webhookId + "." + webhookTimestamp + ".", payload);
         boolean anyParsed = false;
         for (String part : webhookSignature.trim().split(" +")) {
@@ -175,6 +203,8 @@ public final class Webhook {
 
     /** {@code v1,<base64 HMAC-SHA256>} of {@code "<id>.<timestamp>.<payload>"}, as Hookbase signs. */
     public String sign(String webhookId, long timestamp, String payload) {
+        Objects.requireNonNull(webhookId, "webhookId");
+        Objects.requireNonNull(payload, "payload");
         return "v1," + Base64.getEncoder().encodeToString(
                 hmac(webhookId + "." + timestamp + ".", payload.getBytes(StandardCharsets.UTF_8)));
     }
@@ -202,17 +232,27 @@ public final class Webhook {
     }
 
     private void verifyTimestamp(String timestamp, Duration tolerance) {
-        long sent;
-        try {
-            sent = Long.parseLong(timestamp.trim());
-        } catch (NumberFormatException e) {
+        // Unix seconds, ASCII digits only (no sign, spaces or other scripts' digits).
+        if (!TIMESTAMP.matcher(timestamp).matches()) {
             throw new WebhookVerificationException("Invalid timestamp format");
         }
+        long sent = Long.parseLong(timestamp);
+        // Both values are at most 15 digits, so the difference cannot overflow.
         long diff = Math.abs(clock.instant().getEpochSecond() - sent);
         if (diff > tolerance.toSeconds()) {
             throw new WebhookVerificationException(
                     "Webhook timestamp is outside tolerance (" + diff + "s > " + tolerance.toSeconds() + "s)");
         }
+    }
+
+    private static void checkTolerance(Duration tolerance) {
+        if (tolerance == null || tolerance.isNegative()) {
+            throw new IllegalArgumentException("tolerance must be zero or positive");
+        }
+    }
+
+    private static byte[] utf8(String payload) {
+        return payload == null ? null : payload.getBytes(StandardCharsets.UTF_8);
     }
 
     private byte[] hmac(String prefix, byte[] payload) {

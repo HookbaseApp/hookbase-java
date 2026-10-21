@@ -1,8 +1,10 @@
 package app.hookbase.models;
 
 import app.hookbase.internal.JsonTextDeserializer;
+import app.hookbase.internal.Redact;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A newly created API key. {@code key} is the full secret: it is returned here once and cannot be
@@ -16,4 +18,10 @@ public record ApiKeyWithSecret(
         String key,
         String keyPrefix,
         @JsonDeserialize(using = JsonTextDeserializer.class) List<String> scopes,
-        String expiresAt) {}
+        String expiresAt) {
+    /** Credentials are printed as {@code <redacted>}, so logging this record is safe. */
+    @Override
+    public String toString() {
+        return Redact.toString(this, Map.of("key", Redact.Rule.SECRET));
+    }
+}

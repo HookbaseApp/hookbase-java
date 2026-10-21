@@ -1,9 +1,11 @@
 package app.hookbase.models;
 
 import app.hookbase.internal.JsonTextDeserializer;
+import app.hookbase.internal.Redact;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A local-development tunnel.
@@ -29,4 +31,10 @@ public record Tunnel(
         long totalRequests,
         String customDomainId,
         String direction,
-        @JsonDeserialize(using = JsonTextDeserializer.class) List<String> allowedHosts) {}
+        @JsonDeserialize(using = JsonTextDeserializer.class) List<String> allowedHosts) {
+    /** Credentials are printed as {@code <redacted>}, so logging this record is safe. */
+    @Override
+    public String toString() {
+        return Redact.toString(this, Map.of("authToken", Redact.Rule.SECRET));
+    }
+}

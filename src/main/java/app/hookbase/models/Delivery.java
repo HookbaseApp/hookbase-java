@@ -1,8 +1,10 @@
 package app.hookbase.models;
 
 import app.hookbase.internal.JsonTextDeserializer;
+import app.hookbase.internal.Redact;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import java.util.Map;
 
 /**
  * One inbound delivery: an event sent to one destination by one route.
@@ -37,4 +39,10 @@ public record Delivery(
         String updatedAt,
         String destinationName,
         String destinationUrl,
-        String eventType) {}
+        String eventType) {
+    /** Credentials are printed as {@code <redacted>}, so logging this record is safe. */
+    @Override
+    public String toString() {
+        return Redact.toString(this, Map.of("responseHeaders", Redact.Rule.HEADERS));
+    }
+}

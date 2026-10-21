@@ -3,6 +3,7 @@ package app.hookbase.internal;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -57,7 +58,10 @@ public final class Json {
         try {
             return MAPPER.treeToValue(node, type);
         } catch (JacksonException e) {
-            throw new HookbaseException("Unexpected response shape for " + type.getTypeName() + ": " + e.getOriginalMessage(), e);
+            // Jackson's message quotes the offending value, which can be a secret (an API key, a
+            // signing secret), so report only the type and where in the response it failed.
+            String where = e instanceof JsonMappingException m ? " at " + m.getPathReference() : "";
+            throw new HookbaseException("Unexpected response shape for " + type.getTypeName() + where);
         }
     }
 

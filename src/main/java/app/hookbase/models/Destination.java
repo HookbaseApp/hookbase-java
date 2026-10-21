@@ -1,5 +1,6 @@
 package app.hookbase.models;
 
+import app.hookbase.internal.Redact;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;
@@ -44,4 +45,10 @@ public record Destination(
         Long successCount,
         Long failureCount,
         String createdAt,
-        String updatedAt) {}
+        String updatedAt) {
+    /** Credentials are printed as {@code <redacted>}, so logging this record is safe. */
+    @Override
+    public String toString() {
+        return Redact.toString(this, Map.of("headers", Redact.Rule.HEADERS, "authConfig", Redact.Rule.KEYS, "config", Redact.Rule.KEYS));
+    }
+}

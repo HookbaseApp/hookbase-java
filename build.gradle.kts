@@ -72,3 +72,11 @@ mavenPublishing {
     if (providers.gradleProperty("signingInMemoryKey").isPresent) signAllPublications()
     coordinates(project.group.toString(), "hookbase-java", project.version.toString())
 }
+
+// Prints the runtime classpath (the jar plus Jackson), for running examples/ with `java -cp`.
+val printRuntimeClasspath by tasks.registering {
+    val cp = tasks.jar.flatMap { it.archiveFile }.map { it.asFile.path }
+    val deps = configurations.runtimeClasspath.map { c -> c.files.map { it.path } }
+    dependsOn(tasks.jar)
+    doLast { println((listOf(cp.get()) + deps.get()).joinToString(File.pathSeparator)) }
+}

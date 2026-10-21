@@ -1,6 +1,7 @@
 package app.hookbase.models;
 
 import app.hookbase.internal.JsonTextDeserializer;
+import app.hookbase.internal.Redact;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.Map;
 
@@ -31,4 +32,10 @@ public record MessageAttempt(
         String triggeredBy,
         String triggeredByUser,
         String createdAt,
-        String completedAt) {}
+        String completedAt) {
+    /** Credentials are printed as {@code <redacted>}, so logging this record is safe. */
+    @Override
+    public String toString() {
+        return Redact.toString(this, Map.of("requestHeaders", Redact.Rule.HEADERS, "responseHeaders", Redact.Rule.HEADERS));
+    }
+}

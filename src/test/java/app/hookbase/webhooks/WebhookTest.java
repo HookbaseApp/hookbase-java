@@ -21,6 +21,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Ported from python-sdk/tests/test_webhook.py, which mirrors api/src/utils/outbound-signature.ts. */
 class WebhookTest {
@@ -229,5 +230,54 @@ class WebhookTest {
         }
         Webhook w = new Webhook("whsec_" + Base64.getEncoder().encodeToString(KEY_BYTES), CLOCK);
         w.verifyHeaders(raw, headers("msg_1", Long.toString(NOW), "v1," + sig), Webhook.DEFAULT_TOLERANCE);
+    }
+    @ParameterizedTest
+    @ValueSource(strings = {"+1760000000", "-1760000000", " 1760000000", "1760000000 ", "\u0661\u0667\u0666\u0660000000", "9223372036854775807", ""})
+    void rejectsNonPlainTimestamps(String ts) {
+        // The format is checked before the age or signature, including the overflow case.
+        Map<String, String> h = headers("msg_1", ts.isEmpty() ? "x" : ts, "v1,AAAA");
+        assertThatThrownBy(() -> wh.verify("{}", h))
+                .isInstanceOf(WebhookVerificationException.class).hasMessageContaining("Invalid timestamp");
+    }
+
+    @Test
+    void secretWithSurroundingWhitespaceIsAccepted() {
+        Webhook w = new Webhook(SECRET + "\n", CLOCK);
+        assertThat(w.verify("{\"a\":1}", wh.generateTestHeaders("{\"a\":1}")).get("a").asInt()).isEqualTo(1);
+    }
+
+    @Test
+    void nullInputsAreVerificationFailuresNotNpes() {
+        Map<String, String> h = wh.generateTestHeaders("{}");
+        assertThatThrownBy(() -> wh.verify((byte[]) null, h)).isInstanceOf(WebhookVerificationException.class);
+        assertThatThrownBy(() -> wh.verify("{}", null)).isInstanceOf(WebhookVerificationException.class);
+        assertThatThrownBy(() -> wh.verifySignature((String) null, "a", "1", "v1,x")).isInstanceOf(WebhookVerificationException.class);
+    }
+
+    @Test
+    void rejectsInvalidTolerance() {
+        Map<String, String> h = wh.generateTestHeaders("{}");
+        assertThatThrownBy(() -> wh.verify("{}", h, (Duration) null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> wh.verify("{}", h, Duration.ofSeconds(-1))).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void bytesOverloadsTakeToleranceAndType() {
+        byte[] body = "{\"data\":7}".getBytes(StandardCharsets.UTF_8);
+        Map<String, String> h = wh.generateTestHeaders("{\"data\":7}", "msg_1", NOW - 100);
+        assertThat(wh.verify(body, h, Duration.ofSeconds(120)).get("data").asInt()).isEqualTo(7);
+        assertThatThrownBy(() -> wh.verify(body, h, Duration.ofSeconds(30))).hasMessageContaining("outside tolerance");
+        record Payload(int data) {}
+        assertThat(wh.verify(body, wh.generateTestHeaders("{\"data\":7}"), Payload.class).data()).isEqualTo(7);
+    }
+
+    @Test
+    void latin1DecodedBodyFailsButBytesPass() {
+        String body = "{\"name\":\"Caf\u00e9\"}";
+        Map<String, String> h = wh.generateTestHeaders(body);
+        byte[] raw = body.getBytes(StandardCharsets.UTF_8);
+        String misdecoded = new String(raw, StandardCharsets.ISO_8859_1);
+        assertThatThrownBy(() -> wh.verify(misdecoded, h)).isInstanceOf(WebhookVerificationException.class);
+        assertThat(wh.verify(raw, h).get("name").asText()).isEqualTo("Caf\u00e9");
     }
 }

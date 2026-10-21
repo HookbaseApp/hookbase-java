@@ -46,13 +46,15 @@ import java.util.regex.Pattern;
  * <p>Retry policy, shared with the other Hookbase SDKs:
  *
  * <ul>
- *   <li>429 is retried after {@code Retry-After} (60 s when absent), for every method: the API
- *       refused the request, so nothing ran.
+ *   <li>429 with a {@code Retry-After} of at most 60 s is retried after that delay, for every
+ *       method: the API refused the request, so nothing ran. A 429 without {@code Retry-After} is a
+ *       plan or monthly quota that waiting will not lift, and a longer delay would park the caller,
+ *       so both are thrown straight away as {@link RateLimitException}.
  *   <li>500, 502, 503, 504, timeouts and dropped connections are retried with exponential backoff
- *       ({@code min(1s·2^n, 10s)} plus up to 1 s of jitter), except on a POST with no
- *       {@code Idempotency-Key}: the POST may already have been carried out, and repeating it can
- *       create the thing twice. Setting {@link RequestOptions#retries()} explicitly opts a POST back
- *       in, as in the Node SDK.
+ *       ({@code min(1s·2^n, 10s)} plus up to 1 s of jitter), except on a POST: it may already have
+ *       been carried out, and repeating it can create the thing twice (or rotate a secret twice).
+ *       A POST is retried only when the API deduplicates it, which is sending an event with an
+ *       {@code Idempotency-Key}, or when {@link RequestOptions#retries()} is set explicitly.
  *   <li>A connection that was never established (refused, DNS failure, connect timeout) is always
  *       retried, POST included: the request never reached the server.
  *   <li>Every other status is the API's answer and is thrown straight away.
@@ -65,7 +67,10 @@ public final class HttpTransport {
     public static final int DEFAULT_MAX_RETRIES = 3;
 
     private static final Set<Integer> RETRY_STATUSES = Set.of(500, 502, 503, 504);
-    private static final Duration DEFAULT_RETRY_AFTER = Duration.ofSeconds(60);
+    /** The longest Retry-After the SDK waits for; a 429 asking for longer is thrown at once. */
+    static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(60);
+    /** POST paths where the API deduplicates on {@code Idempotency-Key}, so a retry is safe. */
+    private static final List<String> IDEMPOTENT_POST_PATHS = List.of("/api/send-event", "/v1/events");
     private static final Pattern JSON_CONTENT_TYPE = Pattern.compile("[/+]json\\b", Pattern.CASE_INSENSITIVE);
     private static final System.Logger LOG = System.getLogger("app.hookbase");
 
@@ -127,7 +132,7 @@ public final class HttpTransport {
         String upper = method.toUpperCase(Locale.ROOT);
         String idempotencyKey = opts.idempotencyKey();
         boolean retryAmbiguousFailures = !upper.equals("POST")
-                || (idempotencyKey != null && !idempotencyKey.isEmpty())
+                || (idempotencyKey != null && !idempotencyKey.isEmpty() && IDEMPOTENT_POST_PATHS.contains(path))
                 || opts.retries() != null;
         int retries = opts.retries() != null ? opts.retries() : maxRetries;
         Duration requestTimeout = opts.timeout() != null ? opts.timeout() : timeout;
@@ -159,6 +164,7 @@ public final class HttpTransport {
             try {
                 return execute(request, requestTimeout);
             } catch (RateLimitException e) {
+                if (e.retryAfter() == null || e.retryAfter().compareTo(MAX_RETRY_AFTER) > 0) throw e;
                 last = e;
                 wait = e.retryAfter();
             } catch (HookbaseApiException e) {
@@ -341,27 +347,38 @@ public final class HttpTransport {
         return out;
     }
 
+    /**
+     * The {@code Retry-After} header as a delay: delta-seconds or an HTTP date. {@code null} when
+     * absent or unparseable. Values beyond a day are capped there, so later arithmetic can't
+     * overflow; anything over {@link #MAX_RETRY_AFTER} is not waited for anyway.
+     */
     static Duration parseRetryAfter(String header) {
-        if (header == null || header.isBlank()) return DEFAULT_RETRY_AFTER;
+        if (header == null || header.isBlank()) return null;
         String value = header.trim();
-        try {
-            return Duration.ofSeconds(Math.max(0, Long.parseLong(value)));
-        } catch (NumberFormatException ignored) {
-            // Retry-After may also be an HTTP date.
+        Duration delay;
+        if (value.matches("[0-9]{1,18}")) {
+            delay = Duration.ofSeconds(Long.parseLong(value));
+        } else {
+            try {
+                ZonedDateTime at = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME);
+                Duration until = Duration.between(ZonedDateTime.now(at.getZone()), at);
+                delay = until.isNegative() ? Duration.ZERO : until;
+            } catch (DateTimeParseException | ArithmeticException ignored) {
+                return null;
+            }
         }
-        try {
-            ZonedDateTime at = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME);
-            Duration until = Duration.between(ZonedDateTime.now(at.getZone()), at);
-            return until.isNegative() ? Duration.ZERO : until;
-        } catch (DateTimeParseException ignored) {
-            return DEFAULT_RETRY_AFTER;
-        }
+        Duration day = Duration.ofDays(1);
+        return delay.compareTo(day) > 0 ? day : delay;
     }
 
     /** Percent-encode one path segment (an id or slug the caller passed). */
     public static String segment(String value) {
         if (value == null || value.isEmpty()) {
             throw new IllegalArgumentException("id must not be null or empty");
+        }
+        // "." and ".." would be resolved as dot segments and reach a different route.
+        if (value.equals(".") || value.equals("..")) {
+            throw new IllegalArgumentException("id must not be \".\" or \"..\"");
         }
         return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }

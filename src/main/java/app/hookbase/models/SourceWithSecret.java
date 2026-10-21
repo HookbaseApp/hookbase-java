@@ -1,6 +1,8 @@
 package app.hookbase.models;
 
+import app.hookbase.internal.Redact;
 import java.util.List;
+import java.util.Map;
 
 /**
  * What {@code sources().create()} returns: a {@link Source} plus the one look at its signing secret
@@ -61,5 +63,11 @@ public record SourceWithSecret(
                 customDomainId, ipFilterMode, ipAllowlist, ipDenylist, encryptFields, maskFields, dedupEnabled,
                 dedupStrategy, dedupWindowHours, dedupCustomHeader, transientMode, allowedMethods, eventCount,
                 routeCount, ingestUrl, createdAt, updatedAt);
+    }
+
+    /** Credentials are printed as {@code <redacted>}, so logging this record is safe. */
+    @Override
+    public String toString() {
+        return Redact.toString(this, Map.of("signingSecret", Redact.Rule.SECRET, "verifyToken", Redact.Rule.SECRET));
     }
 }

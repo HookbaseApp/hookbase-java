@@ -23,8 +23,11 @@ import app.hookbase.resources.SubscriptionsResource;
 import app.hookbase.resources.TransformsResource;
 import app.hookbase.resources.TunnelsResource;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -76,6 +79,11 @@ public final class Hookbase {
     }
 
     private Hookbase(Builder b) {
+        checkBaseUrl(b.baseUrl);
+        if (b.httpClient != null && b.httpClient.followRedirects() != HttpClient.Redirect.NEVER) {
+            // The JDK copies request headers onto a followed redirect, Authorization included.
+            throw new IllegalArgumentException("httpClient must not follow redirects (use Redirect.NEVER)");
+        }
         HttpClient client = b.httpClient != null
                 ? b.httpClient
                 : HttpClient.newBuilder()
@@ -211,6 +219,29 @@ public final class Hookbase {
         return new Builder();
     }
 
+    /** HTTPS only, so the API key is never sent in cleartext; plain HTTP is allowed for loopback. */
+    private static void checkBaseUrl(String baseUrl) {
+        URI uri;
+        try {
+            uri = new URI(baseUrl);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("baseUrl is not a valid URL");
+        }
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+        String host = uri.getHost();
+        if (host == null || !(scheme.equals("https") || scheme.equals("http"))) {
+            throw new IllegalArgumentException("baseUrl must be an http(s) URL with a host");
+        }
+        if (uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null) {
+            throw new IllegalArgumentException("baseUrl must not contain credentials, a query or a fragment");
+        }
+        boolean loopback = host.equals("localhost") || host.equals("127.0.0.1") || host.equals("[::1]")
+                || host.endsWith(".localhost");
+        if (scheme.equals("http") && !loopback) {
+            throw new IllegalArgumentException("baseUrl must use https (plain http is allowed only for localhost)");
+        }
+    }
+
     /**
      * Make a raw API request, for an endpoint this SDK version doesn't wrap yet. Gets the same
      * auth, retries and error mapping as every other call.
@@ -244,7 +275,10 @@ public final class Hookbase {
             return this;
         }
 
-        /** API base URL. Default {@code https://api.hookbase.app}. */
+        /**
+         * API base URL. Default {@code https://api.hookbase.app}. Must be {@code https}, except for
+         * {@code localhost}/loopback.
+         */
         public Builder baseUrl(String baseUrl) {
             this.baseUrl = Objects.requireNonNull(baseUrl, "baseUrl");
             return this;
@@ -264,7 +298,9 @@ public final class Hookbase {
 
         /**
          * A preconfigured {@link HttpClient} (proxy, SSL context, executor). Its own connect timeout
-         * applies; {@link #timeout} still bounds each request.
+         * applies; {@link #timeout} still bounds each request. It must not follow redirects ({@link
+         * HttpClient.Redirect#NEVER}, the JDK default), since a followed redirect would carry the API
+         * key to the new location.
          */
         public Builder httpClient(HttpClient httpClient) {
             this.httpClient = httpClient;
@@ -287,7 +323,8 @@ public final class Hookbase {
         }
 
         /**
-         * @throws IllegalArgumentException if the API key is missing, or retries/timeout are invalid
+         * @throws IllegalArgumentException if the API key is missing, the base URL is not https (or
+         *     loopback http), the HTTP client follows redirects, or retries/timeout are invalid
          */
         public Hookbase build() {
             return new Hookbase(this);
