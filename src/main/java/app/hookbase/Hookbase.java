@@ -2,7 +2,22 @@ package app.hookbase;
 
 import app.hookbase.internal.HttpTransport;
 import app.hookbase.internal.SdkVersion;
+import app.hookbase.resources.AnalyticsResource;
+import app.hookbase.resources.ApiKeysResource;
 import app.hookbase.resources.ApplicationsResource;
+import app.hookbase.resources.CronJobsResource;
+import app.hookbase.resources.DeliveriesResource;
+import app.hookbase.resources.DlqResource;
+import app.hookbase.resources.EndpointsResource;
+import app.hookbase.resources.EventTypesResource;
+import app.hookbase.resources.EventsResource;
+import app.hookbase.resources.FiltersResource;
+import app.hookbase.resources.MessagesResource;
+import app.hookbase.resources.PortalTokensResource;
+import app.hookbase.resources.SchemasResource;
+import app.hookbase.resources.SubscriptionsResource;
+import app.hookbase.resources.TransformsResource;
+import app.hookbase.resources.TunnelsResource;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -31,6 +46,21 @@ public final class Hookbase {
 
     // RESOURCE FIELDS
     private final ApplicationsResource applications;
+    private final EndpointsResource endpoints;
+    private final EventTypesResource eventTypes;
+    private final SubscriptionsResource subscriptions;
+    private final MessagesResource messages;
+    private final PortalTokensResource portalTokens;
+    private final DlqResource dlq;
+    private final EventsResource events;
+    private final DeliveriesResource deliveries;
+    private final TransformsResource transforms;
+    private final FiltersResource filters;
+    private final SchemasResource schemas;
+    private final AnalyticsResource analytics;
+    private final ApiKeysResource apiKeys;
+    private final TunnelsResource tunnels;
+    private final CronJobsResource cronJobs;
 
     /** A client with default settings: {@code https://api.hookbase.app}, 30 s timeout, 3 retries. */
     public Hookbase(String apiKey) {
@@ -47,12 +77,102 @@ public final class Hookbase {
         this.http = new HttpTransport(b.apiKey, b.baseUrl, b.timeout, b.maxRetries, client, b.debug, b.sleeper);
         // RESOURCE INIT
         this.applications = new ApplicationsResource(http);
+        this.endpoints = new EndpointsResource(http);
+        this.eventTypes = new EventTypesResource(http);
+        this.subscriptions = new SubscriptionsResource(http);
+        this.messages = new MessagesResource(http);
+        this.portalTokens = new PortalTokensResource(http);
+        this.dlq = new DlqResource(http);
+        this.events = new EventsResource(http);
+        this.deliveries = new DeliveriesResource(http);
+        this.transforms = new TransformsResource(http);
+        this.filters = new FiltersResource(http);
+        this.schemas = new SchemasResource(http);
+        this.analytics = new AnalyticsResource(http);
+        this.apiKeys = new ApiKeysResource(http);
+        this.tunnels = new TunnelsResource(http);
+        this.cronJobs = new CronJobsResource(http);
     }
 
     // RESOURCE ACCESSORS
     /** Outbound applications (your customers/tenants). */
     public ApplicationsResource applications() {
         return applications;
+    }
+
+    /** Outbound endpoints: where your customers receive webhooks. */
+    public EndpointsResource endpoints() {
+        return endpoints;
+    }
+
+    /** Outbound event types that endpoints subscribe to. */
+    public EventTypesResource eventTypes() {
+        return eventTypes;
+    }
+
+    /** Subscriptions: which event types each endpoint receives. */
+    public SubscriptionsResource subscriptions() {
+        return subscriptions;
+    }
+
+    /** Send outbound events, and read the messages and attempts that deliver them. */
+    public MessagesResource messages() {
+        return messages;
+    }
+
+    /** Tokens for the embeddable customer portal. */
+    public PortalTokensResource portalTokens() {
+        return portalTokens;
+    }
+
+    /** The outbound dead letter queue. */
+    public DlqResource dlq() {
+        return dlq;
+    }
+
+    /** Inbound webhook events received by your sources. */
+    public EventsResource events() {
+        return events;
+    }
+
+    /** Inbound deliveries (event to destination), and replaying them. */
+    public DeliveriesResource deliveries() {
+        return deliveries;
+    }
+
+    /** Inbound payload transforms. */
+    public TransformsResource transforms() {
+        return transforms;
+    }
+
+    /** Inbound routing filters. */
+    public FiltersResource filters() {
+        return filters;
+    }
+
+    /** JSON schemas for validating inbound payloads. */
+    public SchemasResource schemas() {
+        return schemas;
+    }
+
+    /** Inbound analytics dashboard and overview. */
+    public AnalyticsResource analytics() {
+        return analytics;
+    }
+
+    /** The organization's API keys. */
+    public ApiKeysResource apiKeys() {
+        return apiKeys;
+    }
+
+    /** Local-development tunnels. */
+    public TunnelsResource tunnels() {
+        return tunnels;
+    }
+
+    /** Cron jobs (scheduled HTTP requests) and cron groups. */
+    public CronJobsResource cronJobs() {
+        return cronJobs;
     }
 
     public static Builder builder() {
