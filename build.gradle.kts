@@ -34,6 +34,16 @@ tasks.javadoc {
 
 // The SDK reads its own version (for the User-Agent) from this file, so the version lives only in
 // gradle.properties and cannot drift the way node-sdk's SDK_VERSION constant did.
+tasks.jar {
+    manifest {
+        attributes(
+            "Automatic-Module-Name" to "app.hookbase",
+            "Implementation-Title" to "hookbase-java",
+            "Implementation-Version" to project.version.toString(),
+        )
+    }
+}
+
 tasks.processResources {
     val version = project.version.toString()
     inputs.property("version", version)
@@ -57,6 +67,8 @@ val checkReleaseTag by tasks.registering {
 
 mavenPublishing {
     publishToMavenCentral()
-    signAllPublications()
+    // Central rejects unsigned artifacts, so a release without the key fails there; skipping signing
+    // when it's absent keeps publishToMavenLocal usable for local testing.
+    if (providers.gradleProperty("signingInMemoryKey").isPresent) signAllPublications()
     coordinates(project.group.toString(), "hookbase-java", project.version.toString())
 }
