@@ -5,7 +5,7 @@ import app.hookbase.testing.MockServer;
 import java.net.http.HttpClient;
 import java.time.Duration;
 
-/** Builds a transport against a MockServer, so the resources can be tested before Hookbase exposes them. */
+/** Builds a transport against a MockServer with no retries, for constructing resources directly. */
 final class DataAdminTestSupport {
     private DataAdminTestSupport() {}
 

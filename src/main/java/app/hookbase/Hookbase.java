@@ -7,6 +7,7 @@ import app.hookbase.resources.ApiKeysResource;
 import app.hookbase.resources.ApplicationsResource;
 import app.hookbase.resources.CronJobsResource;
 import app.hookbase.resources.DeliveriesResource;
+import app.hookbase.resources.DestinationsResource;
 import app.hookbase.resources.DlqResource;
 import app.hookbase.resources.EndpointsResource;
 import app.hookbase.resources.EventTypesResource;
@@ -14,7 +15,10 @@ import app.hookbase.resources.EventsResource;
 import app.hookbase.resources.FiltersResource;
 import app.hookbase.resources.MessagesResource;
 import app.hookbase.resources.PortalTokensResource;
+import app.hookbase.resources.ProvidersResource;
+import app.hookbase.resources.RoutesResource;
 import app.hookbase.resources.SchemasResource;
+import app.hookbase.resources.SourcesResource;
 import app.hookbase.resources.SubscriptionsResource;
 import app.hookbase.resources.TransformsResource;
 import app.hookbase.resources.TunnelsResource;
@@ -52,11 +56,15 @@ public final class Hookbase {
     private final MessagesResource messages;
     private final PortalTokensResource portalTokens;
     private final DlqResource dlq;
+    private final SourcesResource sources;
+    private final DestinationsResource destinations;
+    private final RoutesResource routes;
     private final EventsResource events;
     private final DeliveriesResource deliveries;
     private final TransformsResource transforms;
     private final FiltersResource filters;
     private final SchemasResource schemas;
+    private final ProvidersResource providers;
     private final AnalyticsResource analytics;
     private final ApiKeysResource apiKeys;
     private final TunnelsResource tunnels;
@@ -83,11 +91,15 @@ public final class Hookbase {
         this.messages = new MessagesResource(http);
         this.portalTokens = new PortalTokensResource(http);
         this.dlq = new DlqResource(http);
+        this.sources = new SourcesResource(http);
+        this.destinations = new DestinationsResource(http);
+        this.routes = new RoutesResource(http);
         this.events = new EventsResource(http);
         this.deliveries = new DeliveriesResource(http);
         this.transforms = new TransformsResource(http);
         this.filters = new FiltersResource(http);
         this.schemas = new SchemasResource(http);
+        this.providers = new ProvidersResource(http);
         this.analytics = new AnalyticsResource(http);
         this.apiKeys = new ApiKeysResource(http);
         this.tunnels = new TunnelsResource(http);
@@ -130,6 +142,21 @@ public final class Hookbase {
         return dlq;
     }
 
+    /** Inbound sources: where third parties send you webhooks. */
+    public SourcesResource sources() {
+        return sources;
+    }
+
+    /** Inbound destinations: where routed events are delivered. */
+    public DestinationsResource destinations() {
+        return destinations;
+    }
+
+    /** Inbound routes connecting sources to destinations. */
+    public RoutesResource routes() {
+        return routes;
+    }
+
     /** Inbound webhook events received by your sources. */
     public EventsResource events() {
         return events;
@@ -153,6 +180,11 @@ public final class Hookbase {
     /** JSON schemas for validating inbound payloads. */
     public SchemasResource schemas() {
         return schemas;
+    }
+
+    /** Provider catalog: what each provider signs with and which secret it needs. */
+    public ProvidersResource providers() {
+        return providers;
     }
 
     /** Inbound analytics dashboard and overview. */
