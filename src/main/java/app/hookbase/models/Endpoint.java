@@ -9,7 +9,8 @@ import java.util.Map;
  * An outbound webhook endpoint: a URL of your customer's that receives the events it is subscribed
  * to.
  *
- * @param secretPrefix the first twelve characters of the signing secret, followed by {@code ...}
+ * @param secretPrefix a masked hint of the signing secret: its first twelve characters followed by
+ *     {@code ...}, or just {@code whsec_...} / {@code whsk_...} when the secret is stored encrypted
  * @param secretVersion increments on every rotation
  * @param headers custom delivery headers, in the order the API sent them; empty when there are none
  *     (see {@link #headerMap()} for a map view)

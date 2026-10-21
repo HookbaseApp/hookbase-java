@@ -80,3 +80,19 @@ val printRuntimeClasspath by tasks.registering {
     dependsOn(tasks.jar)
     doLast { println((listOf(cp.get()) + deps.get()).joinToString(File.pathSeparator)) }
 }
+
+// examples/: compiled by `build` so they can't drift from the API; run one with
+// `./gradlew runExample -Pexample=BasicUsage`. Not published.
+val examples by sourceSets.creating {
+    java.srcDir("examples/src/main/java")
+    compileClasspath += sourceSets.main.get().output + configurations.runtimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
+tasks.named("check") { dependsOn(tasks.named(examples.classesTaskName)) }
+
+tasks.register<JavaExec>("runExample") {
+    description = "Runs examples/<example>.java (-Pexample=BasicUsage)."
+    classpath = examples.runtimeClasspath
+    mainClass = providers.gradleProperty("example").map { "examples.$it" }.orElse("examples.BasicUsage")
+}
