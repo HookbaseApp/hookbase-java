@@ -1,9 +1,7 @@
 package app.hookbase.resources;
 
-import app.hookbase.Page;
-import app.hookbase.Pager;
+import app.hookbase.ApiClient;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.Tunnel;
 import app.hookbase.models.TunnelBulkDeleteResult;
 import app.hookbase.params.CreateTunnelParams;
@@ -16,28 +14,18 @@ public final class TunnelsResource extends BaseResource {
 
     private static final String PATH = "/api/tunnels";
 
-    public TunnelsResource(HttpTransport http) {
+    public TunnelsResource(ApiClient http) {
         super(http);
     }
 
-    /** Every tunnel. The API returns them all at once, so this is a single page. */
-    public Page<Tunnel> list(RequestOptions options) {
+    /** Every tunnel. The API returns them all at once. */
+    public List<Tunnel> list(RequestOptions options) {
         JsonNode node = get(PATH, null, options);
-        List<Tunnel> data = list(node, node != null && node.has("tunnels") ? "tunnels" : "data", Tunnel.class);
-        return new Page<>(data, data.size(), data.size(), 0, false, null);
+        return list(node, node != null && node.has("tunnels") ? "tunnels" : "data", Tunnel.class);
     }
 
-    public Page<Tunnel> list() {
+    public List<Tunnel> list() {
         return list((RequestOptions) null);
-    }
-
-    /** Every tunnel, as a {@link Pager} (one request). */
-    public Pager<Tunnel> listAll(RequestOptions options) {
-        return Pager.numbered(1, n -> list(options));
-    }
-
-    public Pager<Tunnel> listAll() {
-        return listAll(null);
     }
 
     public Tunnel get(String id, RequestOptions options) {

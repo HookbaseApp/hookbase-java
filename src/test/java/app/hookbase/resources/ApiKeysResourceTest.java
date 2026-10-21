@@ -2,7 +2,6 @@ package app.hookbase.resources;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import app.hookbase.Page;
 import app.hookbase.models.ApiKey;
 import app.hookbase.models.ApiKeyWithSecret;
 import app.hookbase.params.CreateApiKeyParams;
@@ -33,17 +32,16 @@ class ApiKeysResourceTest {
         server.enqueue(200, "{\"apiKeys\":[{\"id\":\"key_1\",\"organizationId\":\"org_1\",\"name\":\"CI\",\"keyPrefix\":\"whr_abcdefgh\","
                 + "\"scopes\":\"[\\\"read\\\",\\\"write\\\"]\",\"lastUsedAt\":null,\"expiresAt\":null,\"createdBy\":\"usr_1\","
                 + "\"createdAt\":\"2026-01-01T00:00:00Z\"}]}");
-        Page<ApiKey> page = apiKeys.list();
+        List<ApiKey> page = apiKeys.list();
         assertThat(server.last().method()).isEqualTo("GET");
         assertThat(server.last().path()).isEqualTo("/api/api-keys");
-        ApiKey key = page.data().getFirst();
+        ApiKey key = page.getFirst();
         assertThat(key.scopes()).containsExactly("read", "write");
         assertThat(key.keyPrefix()).isEqualTo("whr_abcdefgh");
         assertThat(key.expiresAt()).isNull();
-        assertThat(page.hasMore()).isFalse();
 
         server.enqueue(200, "{\"data\":[{\"id\":\"key_2\",\"scopes\":[\"read\"]}]}");
-        assertThat(apiKeys.listAll().stream().toList()).extracting(ApiKey::id).containsExactly("key_2");
+        assertThat(apiKeys.list()).extracting(ApiKey::id).containsExactly("key_2");
     }
 
     @Test

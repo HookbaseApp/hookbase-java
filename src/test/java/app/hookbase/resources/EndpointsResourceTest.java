@@ -161,10 +161,21 @@ class EndpointsResourceTest {
         assertThat(server.last().method()).isEqualTo("POST");
         assertThat(server.last().path()).isEqualTo("/api/webhook-endpoints/ep_1/rotate-secret");
         assertThat(server.last().rawBody()).isEqualTo("{\"gracePeriodSeconds\":0}");
-        assertThat(res).isEqualTo(new EndpointRotateSecretResult("whsec_new", "2026-10-17T13:00:00Z", 3));
+        assertThat(res).isEqualTo(new EndpointRotateSecretResult(null, "whsec_new", null, null, "2026-10-17T13:00:00Z", 3));
 
         endpoints.rotateSecret("app_1", "ep_1");
         assertThat(server.last().rawBody()).isNull();
+    }
+
+    @Test
+    void rotateSecretOnAnEd25519EndpointReturnsTheKeyPair() {
+        server.enqueue(200, "{\"signatureScheme\":\"ed25519\",\"publicKey\":\"whpk_new\",\"previousPublicKey\":\"whpk_old\","
+                + "\"previousSecretExpiresAt\":\"2026-10-17T13:00:00Z\",\"secretVersion\":2}");
+        EndpointRotateSecretResult res = endpoints.rotateSecret("app_1", "ep_1");
+        assertThat(res.signatureScheme()).isEqualTo("ed25519");
+        assertThat(res.secret()).isNull();
+        assertThat(res.publicKey()).isEqualTo("whpk_new");
+        assertThat(res.previousPublicKey()).isEqualTo("whpk_old");
     }
 
     @Test
@@ -174,7 +185,6 @@ class EndpointsResourceTest {
         assertThat(stats.averageLatency()).isEqualTo(143.0);
         assertThat(stats.totalMessages()).isEqualTo(900);
         assertThat(stats.successRate()).isCloseTo(880.0 / 900 * 100, org.assertj.core.data.Offset.offset(1e-9));
-        assertThat(stats.recentFailures()).isZero();
 
         server.enqueue(200, "{\"data\":{\"id\":\"ep_1\",\"totalMessages\":0,\"avgResponseTimeMs\":null}}");
         EndpointStats empty = endpoints.getStats("app_1", "ep_1");

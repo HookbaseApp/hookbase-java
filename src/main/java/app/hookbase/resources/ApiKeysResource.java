@@ -1,9 +1,7 @@
 package app.hookbase.resources;
 
-import app.hookbase.Page;
-import app.hookbase.Pager;
+import app.hookbase.ApiClient;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.ApiKey;
 import app.hookbase.models.ApiKeyWithSecret;
 import app.hookbase.params.CreateApiKeyParams;
@@ -16,28 +14,18 @@ public final class ApiKeysResource extends BaseResource {
 
     private static final String PATH = "/api/api-keys";
 
-    public ApiKeysResource(HttpTransport http) {
+    public ApiKeysResource(ApiClient http) {
         super(http);
     }
 
-    /** Every API key (without secrets). The API returns them all at once, so this is a single page. */
-    public Page<ApiKey> list(RequestOptions options) {
+    /** Every API key (without secrets). The API returns them all at once. */
+    public List<ApiKey> list(RequestOptions options) {
         JsonNode node = get(PATH, null, options);
-        List<ApiKey> data = list(node, node != null && node.has("apiKeys") ? "apiKeys" : "data", ApiKey.class);
-        return new Page<>(data, data.size(), data.size(), 0, false, null);
+        return list(node, node != null && node.has("apiKeys") ? "apiKeys" : "data", ApiKey.class);
     }
 
-    public Page<ApiKey> list() {
+    public List<ApiKey> list() {
         return list((RequestOptions) null);
-    }
-
-    /** Every API key, as a {@link Pager} (one request). */
-    public Pager<ApiKey> listAll(RequestOptions options) {
-        return Pager.numbered(1, n -> list(options));
-    }
-
-    public Pager<ApiKey> listAll() {
-        return listAll(null);
     }
 
     /**

@@ -36,6 +36,11 @@ public final class CreateEventTypeParams extends Params<CreateEventTypeParams> {
         return set("documentationUrl", documentationUrl);
     }
 
+    /** Reject sends whose payload doesn't match {@code schema}. Default false. */
+    public CreateEventTypeParams validatePayloads(boolean validatePayloads) {
+        return set("validatePayloads", validatePayloads);
+    }
+
     /** The API defaults to true. */
     public CreateEventTypeParams isEnabled(boolean isEnabled) {
         return set("isEnabled", isEnabled);

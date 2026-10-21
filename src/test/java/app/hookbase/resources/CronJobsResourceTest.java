@@ -2,7 +2,6 @@ package app.hookbase.resources;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import app.hookbase.Page;
 import app.hookbase.models.CronGroup;
 import app.hookbase.models.CronJob;
 import app.hookbase.models.CronJobExecution;
@@ -10,6 +9,7 @@ import app.hookbase.params.CreateCronGroupParams;
 import app.hookbase.params.CreateCronJobParams;
 import app.hookbase.params.UpdateCronJobParams;
 import app.hookbase.testing.MockServer;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,19 +40,14 @@ class CronJobsResourceTest {
     }
 
     @Test
-    void listAndListAll() {
+    void list() {
         server.enqueue(200, "{\"cronJobs\":[" + JOB + "]}");
-        Page<CronJob> page = cron.list();
+        List<CronJob> page = cron.list();
         assertThat(server.last().path()).isEqualTo("/api/cron");
         assertThat(server.last().query()).isEmpty();
-        CronJob job = page.data().getFirst();
+        CronJob job = page.getFirst();
         assertThat(job.useStaticIp()).isTrue();
         assertThat(job.headers()).isEqualTo("{\"Authorization\":\"****\"}");
-        assertThat(page.hasMore()).isFalse();
-
-        server.enqueue(200, "{\"cronJobs\":[" + JOB + "," + JOB + "]}");
-        assertThat(cron.listAll().stream().toList()).hasSize(2);
-        assertThat(server.requests()).hasSize(2);
     }
 
     @Test
@@ -98,13 +93,13 @@ class CronJobsResourceTest {
     void groups() {
         server.enqueue(200, "{\"groups\":[{\"id\":\"grp_1\",\"name\":\"Billing\",\"slug\":\"billing\",\"isCollapsed\":false,"
                 + "\"sortOrder\":2,\"jobCount\":4}]}");
-        Page<CronGroup> page = cron.listGroups();
+        List<CronGroup> page = cron.listGroups();
         assertThat(server.last().path()).isEqualTo("/api/cron-groups");
-        assertThat(page.data().getFirst().jobCount()).isEqualTo(4);
-        assertThat(page.data().getFirst().sortOrder()).isEqualTo(2);
+        assertThat(page.getFirst().jobCount()).isEqualTo(4);
+        assertThat(page.getFirst().sortOrder()).isEqualTo(2);
 
         server.enqueue(200, "{\"groups\":[]}");
-        assertThat(cron.listAllGroups().stream().toList()).isEmpty();
+        assertThat(cron.listGroups()).isEmpty();
 
         server.enqueue(201, "{\"group\":{\"id\":\"grp_2\",\"name\":\"Ops\",\"description\":\"d\"}}");
         CronGroup g = cron.createGroup(new CreateCronGroupParams().name("Ops").description("d"));

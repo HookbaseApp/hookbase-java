@@ -1,9 +1,9 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.BulkDeleteResult;
 import app.hookbase.models.CircuitResetResult;
 import app.hookbase.models.CircuitStatusInfo;
@@ -25,7 +25,7 @@ public final class RoutesResource extends BaseResource {
 
     private static final String PATH = "/api/routes";
 
-    public RoutesResource(HttpTransport http) {
+    public RoutesResource(ApiClient http) {
         super(http);
     }
 

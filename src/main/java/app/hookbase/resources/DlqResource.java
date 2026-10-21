@@ -1,9 +1,9 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.DlqBulkDeleteResult;
 import app.hookbase.models.DlqBulkRetryResult;
 import app.hookbase.models.DlqMessage;
@@ -19,7 +19,7 @@ public final class DlqResource extends BaseResource {
 
     private static final String PATH = "/api/outbound-messages/dlq";
 
-    public DlqResource(HttpTransport http) {
+    public DlqResource(ApiClient http) {
         super(http);
     }
 
@@ -67,7 +67,7 @@ public final class DlqResource extends BaseResource {
     /**
      * Retry one DLQ message. The retry is a new outbound message, whose id is
      * {@link MessageReplayResult#newMessageId()}. Not retried automatically after a timeout or 5xx
-     * unless you set an idempotency key or {@link RequestOptions#retries()}.
+     * unless you set {@link RequestOptions#retries()}.
      */
     public MessageReplayResult retry(String id, RequestOptions options) {
         return unwrap(post(PATH + "/" + seg(id) + "/retry", null, options), "data", MessageReplayResult.class);

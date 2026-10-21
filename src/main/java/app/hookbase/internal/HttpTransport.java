@@ -1,5 +1,6 @@
 package app.hookbase.internal;
 
+import app.hookbase.ApiClient;
 import app.hookbase.RequestOptions;
 import app.hookbase.errors.AuthenticationException;
 import app.hookbase.errors.ConflictException;
@@ -60,7 +61,7 @@ import java.util.regex.Pattern;
  *   <li>Every other status is the API's answer and is thrown straight away.
  * </ul>
  */
-public final class HttpTransport {
+public final class HttpTransport implements ApiClient {
 
     public static final String DEFAULT_BASE_URL = "https://api.hookbase.app";
     public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
@@ -127,6 +128,7 @@ public final class HttpTransport {
      * @param query values that are {@code null} are left out; collections are sent comma-joined
      * @param body serialized as JSON; {@code null} means no body
      */
+    @Override
     public JsonNode request(String method, String path, Map<String, ?> query, Object body, RequestOptions options) {
         RequestOptions opts = options == null ? RequestOptions.NONE : options;
         String upper = method.toUpperCase(Locale.ROOT);

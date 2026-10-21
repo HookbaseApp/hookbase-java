@@ -1,5 +1,6 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.RequestOptions;
 import app.hookbase.internal.HttpTransport;
@@ -18,9 +19,9 @@ import java.util.function.UnaryOperator;
 /** Shared plumbing for the resource classes. Not meant to be subclassed outside the SDK. */
 public abstract class BaseResource {
 
-    protected final HttpTransport http;
+    protected final ApiClient http;
 
-    protected BaseResource(HttpTransport http) {
+    protected BaseResource(ApiClient http) {
         this.http = http;
     }
 

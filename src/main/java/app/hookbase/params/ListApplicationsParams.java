@@ -16,4 +16,14 @@ public final class ListApplicationsParams extends Params<ListApplicationsParams>
     public ListApplicationsParams search(String search) {
         return set("search", search);
     }
+
+    /** Only disabled ({@code true}) or only enabled ({@code false}) applications. */
+    public ListApplicationsParams isDisabled(boolean isDisabled) {
+        return set("isDisabled", isDisabled);
+    }
+
+    /** {@code desc} (newest first, the default) or {@code asc}. */
+    public ListApplicationsParams order(String order) {
+        return set("order", order);
+    }
 }

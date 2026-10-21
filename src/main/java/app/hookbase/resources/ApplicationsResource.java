@@ -1,9 +1,9 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.Application;
 import app.hookbase.params.CreateApplicationParams;
 import app.hookbase.params.ListApplicationsParams;
@@ -16,7 +16,7 @@ public final class ApplicationsResource extends BaseResource {
 
     private static final String PATH = "/api/webhook-applications";
 
-    public ApplicationsResource(HttpTransport http) {
+    public ApplicationsResource(ApiClient http) {
         super(http);
     }
 

@@ -1,7 +1,7 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.AnalyticsDashboard;
 import app.hookbase.models.AnalyticsOverviewStats;
 import app.hookbase.params.AnalyticsDashboardParams;
@@ -11,7 +11,7 @@ public final class AnalyticsResource extends BaseResource {
 
     private static final String PATH = "/api/analytics";
 
-    public AnalyticsResource(HttpTransport http) {
+    public AnalyticsResource(ApiClient http) {
         super(http);
     }
 

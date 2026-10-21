@@ -1,7 +1,7 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.PortalToken;
 import app.hookbase.params.CreatePortalTokenParams;
 import java.util.List;
@@ -9,7 +9,7 @@ import java.util.List;
 /** Tokens for the embeddable customer portal, each scoped to one application. */
 public final class PortalTokensResource extends BaseResource {
 
-    public PortalTokensResource(HttpTransport http) {
+    public PortalTokensResource(ApiClient http) {
         super(http);
     }
 

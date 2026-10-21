@@ -1,9 +1,9 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.Event;
 import app.hookbase.models.EventDebugInfo;
 import app.hookbase.models.EventDetail;
@@ -21,7 +21,7 @@ public final class EventsResource extends BaseResource {
 
     private static final String PATH = "/api/events";
 
-    public EventsResource(HttpTransport http) {
+    public EventsResource(ApiClient http) {
         super(http);
     }
 

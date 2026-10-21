@@ -1,9 +1,9 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.Endpoint;
 import app.hookbase.models.EndpointRotateSecretResult;
 import app.hookbase.models.EndpointStats;
@@ -27,7 +27,7 @@ public final class EndpointsResource extends BaseResource {
 
     private static final String PATH = "/api/webhook-endpoints";
 
-    public EndpointsResource(HttpTransport http) {
+    public EndpointsResource(ApiClient http) {
         super(http);
     }
 
@@ -155,7 +155,7 @@ public final class EndpointsResource extends BaseResource {
         Endpoint ep = get(applicationId, endpointId, options);
         double successRate = ep.totalMessages() > 0 ? (ep.totalSuccesses() / (double) ep.totalMessages()) * 100 : 0;
         double averageLatency = ep.avgResponseTimeMs() != null ? ep.avgResponseTimeMs() : 0;
-        return new EndpointStats(ep.totalMessages(), ep.totalSuccesses(), ep.totalFailures(), successRate, averageLatency, 0);
+        return new EndpointStats(ep.totalMessages(), ep.totalSuccesses(), ep.totalFailures(), successRate, averageLatency);
     }
 
     public EndpointStats getStats(String applicationId, String endpointId) {

@@ -1,9 +1,9 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.BulkDeleteResult;
 import app.hookbase.models.ImportResult;
 import app.hookbase.models.PendingVerification;
@@ -23,7 +23,7 @@ public final class SourcesResource extends BaseResource {
 
     private static final String PATH = "/api/sources";
 
-    public SourcesResource(HttpTransport http) {
+    public SourcesResource(ApiClient http) {
         super(http);
     }
 

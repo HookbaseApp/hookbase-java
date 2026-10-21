@@ -51,6 +51,11 @@ public final class SendMessageParams extends Params<SendMessageParams> {
         return set("labels", labels);
     }
 
+    /** The version the payload is in: {@code "latest"} (the default) or a version label. */
+    public SendMessageParams eventVersion(String eventVersion) {
+        return set("eventVersion", eventVersion);
+    }
+
     /** 0=Critical, 1=High, 2=Normal, 3=Low, 4=Bulk. */
     public SendMessageParams priority(int priority) {
         return set("priority", priority);

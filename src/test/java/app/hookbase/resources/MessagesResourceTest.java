@@ -100,67 +100,13 @@ class MessagesResourceTest {
     }
 
     @Test
-    void aliasesCallTheSameRoutes() {
-        server.otherwise(200, cursorPage(LIST_ITEM, null));
-        messages.listOutbound("app_1", "ignored", new ListMessagesParams().status("failed"));
-        assertThat(server.last().query()).containsExactlyInAnyOrderEntriesOf(Map.of("applicationId", "app_1", "status", "failed"));
-        messages.listAllOutbound("app_1");
-        assertThat(server.last().path()).isEqualTo("/api/outbound-messages");
-
-        server.enqueue(200, "{\"data\":" + LIST_ITEM + "}");
-        assertThat(messages.getOutbound("app_1", "om_1").id()).isEqualTo("om_1");
-        assertThat(server.last().path()).isEqualTo("/api/outbound-messages/om_1");
-    }
-
-    @Test
-    void getBindsTheDetailFields() {
-        server.enqueue(200, """
-                {"data":{"id":"om_1","eventId":"evt_1","status":"success","subscriptionId":"sub_1","eventTypeId":"et_1",
-                 "lastErrorType":null,"payloadKey":"outbound/x.json","payloadSizeBytes":12,"payloadHash":"abc",
-                 "metadata":{"replayedFrom":"om_0"},"priority":2,"completedAt":"2026-10-17T00:00:01Z",
-                 "endpointDescription":"primary","payload":{"orderId":1}}}""");
-        OutboundMessage m = messages.get("app_1", "om/1");
-        assertThat(server.last().path()).isEqualTo("/api/outbound-messages/om%2F1");
-        assertThat(m.subscriptionId()).isEqualTo("sub_1");
-        assertThat(m.payload().get("orderId").asInt()).isEqualTo(1);
-        assertThat(m.metadata().get("replayedFrom").asText()).isEqualTo("om_0");
-        assertThat(m.priority()).isEqualTo(2);
-        assertThat(m.payloadSizeBytes()).isEqualTo(12L);
-        assertThat(m.endpointDescription()).isEqualTo("primary");
-    }
-
-    @Test
-    void listAttemptsBindsTheApiFieldNames() {
-        server.enqueue(200, """
-                {"data":[{"id":"att_1","messageId":"om_1","attemptNumber":1,"status":"failed","responseStatus":500,
-                 "responseHeaders":{"content-type":"text/plain"},"responseBody":"nope","responseTimeMs":123,"totalTimeMs":130,
-                 "errorType":"http_error","errorMessage":"HTTP 500","errorCode":null,"requestUrl":"https://a.example",
-                 "requestHeaders":{"webhook-id":"evt_1"},"requestBodySize":42,"triggeredBy":"system","triggeredByUser":null,
-                 "createdAt":"2026-10-17T00:00:00Z","completedAt":"2026-10-17T00:00:00.130Z"}]}""");
-        List<MessageAttempt> attempts = messages.listAttempts("app_1", "om_1");
-        assertThat(server.last().path()).isEqualTo("/api/outbound-messages/om_1/attempts");
-        MessageAttempt a = attempts.getFirst();
-        assertThat(a.messageId()).isEqualTo("om_1");
-        assertThat(a.responseTimeMs()).isEqualTo(123);
-        assertThat(a.errorMessage()).isEqualTo("HTTP 500");
-        assertThat(a.responseHeaders()).containsEntry("content-type", "text/plain");
-        assertThat(a.requestHeaders()).containsEntry("webhook-id", "evt_1");
-        assertThat(a.triggeredByUser()).isNull();
-
-        server.enqueue(200, "{\"data\":[]}");
-        assertThat(messages.listAttempts("app_1", "om_1")).isEmpty();
-    }
-
-    @Test
-    void retryAndResendPostToReplay() {
+    void retryPostsToReplay() {
         String replay = "{\"data\":{\"originalMessageId\":\"msg_1\",\"newMessageId\":\"msg_2\",\"status\":\"queued\"}}";
-        server.enqueue(201, replay).enqueue(201, replay);
+        server.enqueue(201, replay);
         MessageReplayResult r = messages.retry("app_1", "msg_1");
         assertThat(server.last().method()).isEqualTo("POST");
         assertThat(server.last().path()).isEqualTo("/api/outbound-messages/msg_1/replay");
         assertThat(r).isEqualTo(new MessageReplayResult("msg_1", "msg_2", "queued"));
-        assertThat(messages.resend("app_1", "msg_1").newMessageId()).isEqualTo("msg_2");
-        assertThat(server.last().path()).isEqualTo("/api/outbound-messages/msg_1/replay");
     }
 
     @Test

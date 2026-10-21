@@ -1,9 +1,7 @@
 package app.hookbase.resources;
 
-import app.hookbase.Page;
-import app.hookbase.Pager;
+import app.hookbase.ApiClient;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.Schema;
 import app.hookbase.models.SchemaValidationResult;
 import app.hookbase.params.CreateSchemaParams;
@@ -17,27 +15,17 @@ public final class SchemasResource extends BaseResource {
 
     private static final String PATH = "/api/schemas";
 
-    public SchemasResource(HttpTransport http) {
+    public SchemasResource(ApiClient http) {
         super(http);
     }
 
-    /** Every schema. The API returns them all at once, so this is a single page. */
-    public Page<Schema> list(RequestOptions options) {
-        List<Schema> data = list(get(PATH, null, options), "schemas", Schema.class);
-        return new Page<>(data, data.size(), data.size(), 0, false, null);
+    /** Every schema. The API returns them all at once. */
+    public List<Schema> list(RequestOptions options) {
+        return list(get(PATH, null, options), "schemas", Schema.class);
     }
 
-    public Page<Schema> list() {
+    public List<Schema> list() {
         return list((RequestOptions) null);
-    }
-
-    /** Every schema, as a {@link Pager} (one request). */
-    public Pager<Schema> listAll(RequestOptions options) {
-        return Pager.numbered(1, n -> list(options));
-    }
-
-    public Pager<Schema> listAll() {
-        return listAll(null);
     }
 
     /** Get a schema by id or slug. */

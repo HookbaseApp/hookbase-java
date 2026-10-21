@@ -1,9 +1,9 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.Transform;
 import app.hookbase.models.TransformTestResult;
 import app.hookbase.params.CreateTransformParams;
@@ -18,7 +18,7 @@ public final class TransformsResource extends BaseResource {
 
     private static final String PATH = "/api/transforms";
 
-    public TransformsResource(HttpTransport http) {
+    public TransformsResource(ApiClient http) {
         super(http);
     }
 

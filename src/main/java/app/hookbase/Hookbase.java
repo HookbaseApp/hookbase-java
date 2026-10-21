@@ -44,7 +44,7 @@ import java.util.Objects;
  *
  * Every call is blocking; run calls on virtual threads for concurrency.
  */
-public final class Hookbase {
+public final class Hookbase implements ApiClient {
 
     /** The SDK version, as sent in the User-Agent. */
     public static final String VERSION = SdkVersion.VERSION;
@@ -247,10 +247,14 @@ public final class Hookbase {
      * auth, retries and error mapping as every other call.
      *
      * @param path the path from the API root, e.g. {@code "/api/alert-rules"}
-     * @param query query parameters; {@code null} values are left out
+     * @param method the HTTP method, e.g. {@code "GET"}
+     * @param query query parameters; {@code null} values are left out and collections are sent
+     *     comma-joined
      * @param body serialized as JSON; {@code null} for none
+     * @param options per-request overrides, or {@code null}
      * @return the parsed response, a text node for a non-JSON body, or {@code null} for 204
      */
+    @Override
     public JsonNode request(String method, String path, Map<String, ?> query, Object body, RequestOptions options) {
         Objects.requireNonNull(method, "method");
         Objects.requireNonNull(path, "path");

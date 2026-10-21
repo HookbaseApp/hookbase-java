@@ -1,9 +1,9 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.Subscription;
 import app.hookbase.models.SubscriptionBulkResult;
 import app.hookbase.params.CreateSubscriptionParams;
@@ -24,7 +24,7 @@ public final class SubscriptionsResource extends BaseResource {
 
     private static final String PATH = "/api/webhook-subscriptions";
 
-    public SubscriptionsResource(HttpTransport http) {
+    public SubscriptionsResource(ApiClient http) {
         super(http);
     }
 

@@ -168,8 +168,8 @@ public final class Webhook {
      * Check a signature header against the payload. Does not check the timestamp's age; use {@link
      * #verify} or {@link #verifyHeaders} for that.
      *
-     * @apiNote Without the timestamp check a captured delivery can be replayed indefinitely. Prefer
-     *     {@link #verify}.
+     * <p><b>Without the timestamp check a captured delivery can be replayed indefinitely.</b> Prefer
+     * {@link #verify}.
      *
      * @throws WebhookVerificationException if no {@code v1} signature in the header matches
      */

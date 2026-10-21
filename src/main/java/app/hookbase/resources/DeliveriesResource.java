@@ -1,9 +1,9 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.Delivery;
 import app.hookbase.models.DeliveryBulkReplayResult;
 import app.hookbase.models.DeliveryReplayResult;
@@ -18,7 +18,7 @@ public final class DeliveriesResource extends BaseResource {
 
     private static final String PATH = "/api/deliveries";
 
-    public DeliveriesResource(HttpTransport http) {
+    public DeliveriesResource(ApiClient http) {
         super(http);
     }
 
@@ -39,15 +39,17 @@ public final class DeliveriesResource extends BaseResource {
         return list(null, null);
     }
 
-    /** Every matching delivery, fetched {@code limit} (default 50) at a time from {@code offset} (default 0). */
+    /**
+     * Every matching delivery, fetched {@code limit} (default 50, at most 100) at a time from {@code
+     * offset} (default 0).
+     */
     public Pager<Delivery> listAll(ListDeliveriesParams params, RequestOptions options) {
         Map<String, Object> q = query(params);
-        int limit = q.get("limit") instanceof Number n ? n.intValue() : 50;
         int start = q.remove("offset") instanceof Number n ? n.intValue() : 0;
-        q.put("limit", limit);
-        return Pager.numbered(0, n -> {
+        q.putIfAbsent("limit", 50);
+        return Pager.offset(start, offset -> {
             Map<String, Object> page = new LinkedHashMap<>(q);
-            page.put("offset", start + n * limit);
+            page.put("offset", offset);
             return page(page, options);
         });
     }

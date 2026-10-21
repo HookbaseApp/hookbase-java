@@ -1,9 +1,9 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.Filter;
 import app.hookbase.models.FilterTestResult;
 import app.hookbase.params.CreateFilterParams;
@@ -18,7 +18,7 @@ public final class FiltersResource extends BaseResource {
 
     private static final String PATH = "/api/filters";
 
-    public FiltersResource(HttpTransport http) {
+    public FiltersResource(ApiClient http) {
         super(http);
     }
 

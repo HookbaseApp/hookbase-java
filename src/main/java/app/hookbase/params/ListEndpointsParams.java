@@ -12,6 +12,11 @@ public final class ListEndpointsParams extends Params<ListEndpointsParams> {
         return set("cursor", cursor);
     }
 
+    /** Only endpoints whose circuit is {@code closed}, {@code open} or {@code half_open}. */
+    public ListEndpointsParams circuitState(String circuitState) {
+        return set("circuitState", circuitState);
+    }
+
     public ListEndpointsParams isDisabled(boolean isDisabled) {
         return set("isDisabled", isDisabled);
     }

@@ -76,6 +76,16 @@ class DeliveriesResourceTest {
     }
 
     @Test
+    void listAllFollowsTheServersClampedLimitWithoutSkippingRows() {
+        // The API caps limit at 100 and echoes the cap; the next offset must follow the rows returned.
+        String hundred = String.join(",", java.util.Collections.nCopies(100, DELIVERY));
+        server.enqueue(200, "{\"deliveries\":[" + hundred + "],\"limit\":100,\"offset\":0}");
+        server.enqueue(200, "{\"deliveries\":[" + DELIVERY + "],\"limit\":100,\"offset\":100}");
+        assertThat(deliveries.listAll(new ListDeliveriesParams().limit(200)).stream().count()).isEqualTo(101);
+        assertThat(server.requests().get(1).query()).containsEntry("offset", "100");
+    }
+
+    @Test
     void listAllDefaultsToLimit50FromZero() {
         server.enqueue(200, "{\"deliveries\":[],\"limit\":50,\"offset\":0}");
         assertThat(deliveries.listAll().stream().toList()).isEmpty();

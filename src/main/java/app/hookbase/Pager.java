@@ -51,6 +51,21 @@ public final class Pager<T> implements Iterable<T> {
     }
 
     /**
+     * An offset list: each request starts where the previous page's rows ended ({@code offset +
+     * data.size()}), so a server that clamps the page size can't make rows be skipped. Stops when
+     * {@code hasMore} is false or a page comes back empty.
+     *
+     * @param startOffset the offset to start at
+     * @param fetchPage fetches the page at the given offset
+     */
+    public static <T> Pager<T> offset(int startOffset, Function<Integer, Page<T>> fetchPage) {
+        return new Pager<>(
+                () -> previous -> fetchPage.apply(
+                        previous == null ? startOffset : previous.offset() + previous.data().size()),
+                page -> !page.hasMore() || page.data().isEmpty());
+    }
+
+    /**
      * A cursor list: follows {@code cursor} until {@code hasMore} is false or no cursor comes back
      * (a page that says there is more but gives no cursor is the last one reachable).
      *

@@ -1,9 +1,9 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.internal.SlugFold;
 import app.hookbase.models.BulkDeleteResult;
 import app.hookbase.models.Destination;
@@ -23,7 +23,7 @@ public final class DestinationsResource extends BaseResource {
 
     private static final String PATH = "/api/destinations";
 
-    public DestinationsResource(HttpTransport http) {
+    public DestinationsResource(ApiClient http) {
         super(http);
     }
 

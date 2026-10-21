@@ -2,7 +2,6 @@ package app.hookbase.resources;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import app.hookbase.Page;
 import app.hookbase.models.Tunnel;
 import app.hookbase.models.TunnelBulkDeleteResult;
 import app.hookbase.params.CreateTunnelParams;
@@ -35,19 +34,15 @@ class TunnelsResourceTest {
     }
 
     @Test
-    void listAndListAll() {
+    void list() {
         server.enqueue(200, "{\"tunnels\":[" + TUNNEL + "]}");
-        Page<Tunnel> page = tunnels.list();
+        List<Tunnel> page = tunnels.list();
         assertThat(server.last().path()).isEqualTo("/api/tunnels");
-        Tunnel t = page.data().getFirst();
+        Tunnel t = page.getFirst();
         assertThat(t.localPort()).isEqualTo(3000);
         assertThat(t.totalRequests()).isEqualTo(12);
         assertThat(t.allowedHosts()).containsExactly("api.example.com");
         assertThat(t.authToken()).isNull();
-
-        server.enqueue(200, "{\"tunnels\":[" + TUNNEL + "," + TUNNEL + "]}");
-        assertThat(tunnels.listAll().stream().toList()).hasSize(2);
-        assertThat(server.requests()).hasSize(2);
     }
 
     @Test

@@ -193,7 +193,7 @@ class DataAdminContractTest {
         @Test
         void listGetCreateValidate() {
             server.enqueue(200, "{\"schemas\":[{\"id\":\"sch_1\",\"name\":\"Webhook Event\"}]}");
-            assertThat(schemas().list().data()).hasSize(1);
+            assertThat(schemas().list()).hasSize(1);
 
             server.enqueue(200, "{\"schema\":{\"id\":\"sch_1\",\"name\":\"Webhook Event\",\"jsonSchema\":{\"type\":\"object\"}}}");
             assertThat(schemas().get("sch_1").name()).isEqualTo("Webhook Event");
@@ -272,8 +272,8 @@ class DataAdminContractTest {
         void listUsesRealFieldNames() {
             server.enqueue(200, "{\"cronJobs\":[" + JOB + "]}");
             var page = cron().list();
-            assertThat(page.data()).hasSize(1);
-            CronJob job = page.data().getFirst();
+            assertThat(page).hasSize(1);
+            CronJob job = page.getFirst();
             assertThat(job.cronExpression()).isEqualTo("0 0 * * *");
             assertThat(job.nextRunAt()).isEqualTo("2026-09-02T00:00:00Z");
             assertThat(job.lastRunAt()).isEqualTo("2026-09-01T00:00:00Z");

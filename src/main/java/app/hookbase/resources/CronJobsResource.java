@@ -1,9 +1,7 @@
 package app.hookbase.resources;
 
-import app.hookbase.Page;
-import app.hookbase.Pager;
+import app.hookbase.ApiClient;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.CronGroup;
 import app.hookbase.models.CronJob;
 import app.hookbase.models.CronJobExecution;
@@ -19,27 +17,17 @@ public final class CronJobsResource extends BaseResource {
     private static final String PATH = "/api/cron";
     private static final String GROUPS = "/api/cron-groups";
 
-    public CronJobsResource(HttpTransport http) {
+    public CronJobsResource(ApiClient http) {
         super(http);
     }
 
-    /** Every cron job. The API returns them all at once, so this is a single page. */
-    public Page<CronJob> list(RequestOptions options) {
-        List<CronJob> data = list(get(PATH, null, options), "cronJobs", CronJob.class);
-        return new Page<>(data, data.size(), data.size(), 0, false, null);
+    /** Every cron job. The API returns them all at once. */
+    public List<CronJob> list(RequestOptions options) {
+        return list(get(PATH, null, options), "cronJobs", CronJob.class);
     }
 
-    public Page<CronJob> list() {
+    public List<CronJob> list() {
         return list((RequestOptions) null);
-    }
-
-    /** Every cron job, as a {@link Pager} (one request). */
-    public Pager<CronJob> listAll(RequestOptions options) {
-        return Pager.numbered(1, n -> list(options));
-    }
-
-    public Pager<CronJob> listAll() {
-        return listAll(null);
     }
 
     public CronJob get(String id, RequestOptions options) {
@@ -87,24 +75,14 @@ public final class CronJobsResource extends BaseResource {
         return trigger(id, null);
     }
 
-    /** Every cron group, as a single page. */
-    public Page<CronGroup> listGroups(RequestOptions options) {
+    /** Every cron group. The API returns them all at once. */
+    public List<CronGroup> listGroups(RequestOptions options) {
         JsonNode node = get(GROUPS, null, options);
-        List<CronGroup> data = list(node, node != null && node.has("groups") ? "groups" : "data", CronGroup.class);
-        return new Page<>(data, data.size(), data.size(), 0, false, null);
+        return list(node, node != null && node.has("groups") ? "groups" : "data", CronGroup.class);
     }
 
-    public Page<CronGroup> listGroups() {
+    public List<CronGroup> listGroups() {
         return listGroups(null);
-    }
-
-    /** Every cron group, as a {@link Pager} (one request). */
-    public Pager<CronGroup> listAllGroups(RequestOptions options) {
-        return Pager.numbered(1, n -> listGroups(options));
-    }
-
-    public Pager<CronGroup> listAllGroups() {
-        return listAllGroups(null);
     }
 
     public CronGroup createGroup(CreateCronGroupParams params, RequestOptions options) {

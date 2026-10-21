@@ -2,12 +2,12 @@ package app.hookbase.resources;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import app.hookbase.Page;
 import app.hookbase.models.Schema;
 import app.hookbase.models.SchemaValidationResult;
 import app.hookbase.params.CreateSchemaParams;
 import app.hookbase.params.UpdateSchemaParams;
 import app.hookbase.testing.MockServer;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,19 +30,14 @@ class SchemasResourceTest {
     }
 
     @Test
-    void listIsOnePageAndParsesSchemaText() {
+    void listParsesSchemaText() {
         server.enqueue(200, "{\"schemas\":[{\"id\":\"sch_1\",\"name\":\"Order\",\"slug\":\"order\","
                 + "\"jsonSchema\":\"{\\\"type\\\":\\\"object\\\"}\"},{\"id\":\"sch_2\",\"name\":\"B\",\"jsonSchema\":{\"type\":\"array\"}}]}");
-        Page<Schema> page = schemas.list();
+        List<Schema> page = schemas.list();
         assertThat(server.last().path()).isEqualTo("/api/schemas");
-        assertThat(page.data()).hasSize(2);
-        assertThat(page.hasMore()).isFalse();
-        assertThat(page.data().get(0).jsonSchema().get("type").asText()).isEqualTo("object");
-        assertThat(page.data().get(1).jsonSchema().get("type").asText()).isEqualTo("array");
-
-        server.enqueue(200, "{\"schemas\":[]}");
-        assertThat(schemas.listAll().stream().toList()).isEmpty();
-        assertThat(server.requests()).hasSize(2);
+        assertThat(page).hasSize(2);
+        assertThat(page.get(0).jsonSchema().get("type").asText()).isEqualTo("object");
+        assertThat(page.get(1).jsonSchema().get("type").asText()).isEqualTo("array");
     }
 
     @Test

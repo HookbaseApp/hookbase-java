@@ -1,9 +1,9 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.MessageAttempt;
 import app.hookbase.models.MessageExport;
 import app.hookbase.models.MessageReplayResult;
@@ -29,7 +29,7 @@ public final class MessagesResource extends BaseResource {
     private static final String SEND_PATH = "/api/send-event";
     private static final String PATH = "/api/outbound-messages";
 
-    public MessagesResource(HttpTransport http) {
+    public MessagesResource(ApiClient http) {
         super(http);
     }
 
@@ -128,48 +128,6 @@ public final class MessagesResource extends BaseResource {
         return get(applicationId, messageId, null);
     }
 
-    /**
-     * The same as {@link #list(String, ListMessagesParams, RequestOptions)}. The message list has no
-     * event filter, so {@code messageId} does not narrow the result.
-     */
-    public Page<OutboundMessage> listOutbound(
-            String applicationId, String messageId, ListMessagesParams params, RequestOptions options) {
-        return list(applicationId, params, options);
-    }
-
-    public Page<OutboundMessage> listOutbound(String applicationId, String messageId, ListMessagesParams params) {
-        return listOutbound(applicationId, messageId, params, null);
-    }
-
-    public Page<OutboundMessage> listOutbound(String applicationId, String messageId) {
-        return listOutbound(applicationId, messageId, null, null);
-    }
-
-    /** The same as {@link #get(String, String, RequestOptions)}. */
-    public OutboundMessage getOutbound(String applicationId, String outboundMessageId, RequestOptions options) {
-        return get(applicationId, outboundMessageId, options);
-    }
-
-    public OutboundMessage getOutbound(String applicationId, String outboundMessageId) {
-        return getOutbound(applicationId, outboundMessageId, null);
-    }
-
-    /**
-     * The same as {@link #list(String, ListMessagesParams, RequestOptions)}: one page, despite the
-     * name. Use {@link #listAll(String, ListMessagesParams, RequestOptions)} to iterate every message.
-     */
-    public Page<OutboundMessage> listAllOutbound(String applicationId, ListMessagesParams params, RequestOptions options) {
-        return list(applicationId, params, options);
-    }
-
-    public Page<OutboundMessage> listAllOutbound(String applicationId, ListMessagesParams params) {
-        return listAllOutbound(applicationId, params, null);
-    }
-
-    public Page<OutboundMessage> listAllOutbound(String applicationId) {
-        return listAllOutbound(applicationId, null, null);
-    }
-
     /** Every delivery attempt of an outbound message, oldest first. */
     public List<MessageAttempt> listAttempts(String applicationId, String outboundMessageId, RequestOptions options) {
         return list(get(PATH + "/" + seg(outboundMessageId) + "/attempts", (Map<String, ?>) null, options), "data", MessageAttempt.class);
@@ -183,9 +141,8 @@ public final class MessagesResource extends BaseResource {
      * Replay an exhausted, DLQ or stalled failed outbound message. The replay is a NEW outbound
      * message, whose id is {@link MessageReplayResult#newMessageId()}.
      *
-     * <p>Not retried automatically after a timeout or 5xx unless you set an idempotency key or
-     * {@link RequestOptions#retries()}: a replay that did go through would otherwise be delivered
-     * twice.
+     * <p>Not retried automatically after a timeout or 5xx unless you set {@link
+     * RequestOptions#retries()}: a replay that did go through would otherwise be delivered twice.
      */
     public MessageReplayResult retry(String applicationId, String outboundMessageId, RequestOptions options) {
         return unwrap(post(PATH + "/" + seg(outboundMessageId) + "/replay", null, options), "data", MessageReplayResult.class);
@@ -193,15 +150,6 @@ public final class MessagesResource extends BaseResource {
 
     public MessageReplayResult retry(String applicationId, String outboundMessageId) {
         return retry(applicationId, outboundMessageId, null);
-    }
-
-    /** The same as {@link #retry(String, String, RequestOptions)}. */
-    public MessageReplayResult resend(String applicationId, String messageId, RequestOptions options) {
-        return retry(applicationId, messageId, options);
-    }
-
-    public MessageReplayResult resend(String applicationId, String messageId) {
-        return resend(applicationId, messageId, null);
     }
 
     /** Outbound message counts by status, across the organization. */
@@ -233,7 +181,8 @@ public final class MessagesResource extends BaseResource {
         q.put("format", "csv");
         q.putAll(query(params, "format"));
         JsonNode node = get(PATH + "/export", q, options);
-        return node == null ? "" : node.asText();
+        if (node == null) return "";
+        return node.isTextual() ? node.asText() : node.toString();
     }
 
     public String exportCsv(ExportMessagesParams params) {

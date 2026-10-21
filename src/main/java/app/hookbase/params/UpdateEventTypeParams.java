@@ -32,6 +32,11 @@ public final class UpdateEventTypeParams extends Params<UpdateEventTypeParams> {
         return set("documentationUrl", documentationUrl);
     }
 
+    /** Reject sends whose payload doesn't match {@code schema}. */
+    public UpdateEventTypeParams validatePayloads(boolean validatePayloads) {
+        return set("validatePayloads", validatePayloads);
+    }
+
     public UpdateEventTypeParams isEnabled(boolean isEnabled) {
         return set("isEnabled", isEnabled);
     }

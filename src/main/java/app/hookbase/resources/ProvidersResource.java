@@ -1,7 +1,7 @@
 package app.hookbase.resources;
 
+import app.hookbase.ApiClient;
 import app.hookbase.RequestOptions;
-import app.hookbase.internal.HttpTransport;
 import app.hookbase.models.CatalogProviderDetail;
 import app.hookbase.models.ProviderCatalogList;
 import app.hookbase.models.ProviderEvents;
@@ -15,7 +15,7 @@ public final class ProvidersResource extends BaseResource {
 
     private static final String PATH = "/api/catalog/providers";
 
-    public ProvidersResource(HttpTransport http) {
+    public ProvidersResource(ApiClient http) {
         super(http);
     }
 
