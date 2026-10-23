@@ -10,6 +10,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.security.KeyFactory;
+import java.security.Signature;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -18,6 +22,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -279,5 +284,147 @@ class WebhookTest {
         String misdecoded = new String(raw, StandardCharsets.ISO_8859_1);
         assertThatThrownBy(() -> wh.verify(misdecoded, h)).isInstanceOf(WebhookVerificationException.class);
         assertThat(wh.verify(raw, h).get("name").asText()).isEqualTo("Caf\u00e9");
+    }
+
+    /** Standard Webhooks v1a (Ed25519), as api/src/utils/outbound-signature.ts signs it. */
+    @Nested
+    class Ed25519 {
+
+        private static final String ID = "msg_2Lh9KQjrsGAMfEvaCjdhyRHXcgT";
+        private static final String BODY = "{\"event\":\"order.created\",\"data\":{\"id\":\"ord_1\",\"name\":\"Zoë\"}}";
+
+        // RFC 8032 test-1 key; SIG was produced by Node WebCrypto importing the key as JWK, exactly as
+        // the API's computeEd25519Signature does, over "<ID>.<NOW>.<BODY>".
+        private static final String SK = "whsk_nWGxne/9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2DXWpgBgrEKt9VL/tPJZAc6DuFy89qmIyWvAhpo9wdRGg==";
+        private static final String PK = "whpk_11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=";
+        private static final String SIG = "LoDxAYFHFhw5FfMLHETDZbvLOHwHchZ82rokrvSbN9+7ALIpQ6zDnHu17Ev0y0F2DrPQOJ7Xd23QLDqCTwctBA==";
+
+        /** An independent signer: the 32-byte seed of a whsk_ key, signed with the JDK directly. */
+        private static String serverSign(String secretKey, String id, long ts, String body) {
+            try {
+                byte[] raw = Base64.getDecoder().decode(secretKey.substring("whsk_".length()));
+                byte[] der = HexFormat.of().parseHex("302e020100300506032b657004220420");
+                byte[] pkcs8 = Arrays.copyOf(der, der.length + 32);
+                System.arraycopy(raw, 0, pkcs8, der.length, 32);
+                Signature signer = Signature.getInstance("Ed25519");
+                signer.initSign(KeyFactory.getInstance("Ed25519").generatePrivate(new PKCS8EncodedKeySpec(pkcs8)));
+                signer.update((id + "." + ts + "." + body).getBytes(StandardCharsets.UTF_8));
+                return Base64.getEncoder().encodeToString(signer.sign());
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        @Test
+        void verifiesASignatureProducedByTheApisWebCryptoPath() {
+            Webhook verifier = new Webhook(PK, CLOCK);
+            JsonNode event = verifier.verify(BODY.getBytes(StandardCharsets.UTF_8), headers(ID, Long.toString(NOW), "v1a," + SIG));
+            assertThat(event.at("/data/name").asText()).isEqualTo("Zoë");
+            assertThat(verifier.signatureScheme()).isEqualTo(Webhook.SCHEME_ED25519);
+            assertThat(new Webhook(SK, CLOCK).sign(ID, NOW, BODY)).isEqualTo("v1a," + SIG);
+        }
+
+        @Test
+        void verifiesAFreshKeyPairSignedLikeTheServer() {
+            Webhook.Ed25519KeyPair pair = Webhook.generateEd25519KeyPair();
+            assertThat(pair.secretKey()).startsWith("whsk_");
+            assertThat(pair.publicKey()).startsWith("whpk_");
+            assertThat(pair.toString()).doesNotContain(pair.secretKey().substring(5));
+            String sig = "v1a," + serverSign(pair.secretKey(), ID, NOW, BODY);
+            new Webhook(pair.publicKey(), CLOCK).verifyHeaders(BODY, headers(ID, Long.toString(NOW), sig), Webhook.DEFAULT_TOLERANCE);
+            // and a whsk_ key verifies with its public half
+            new Webhook(pair.secretKey(), CLOCK).verifyHeaders(BODY, headers(ID, Long.toString(NOW), sig), Webhook.DEFAULT_TOLERANCE);
+        }
+
+        @Test
+        void generateTestHeadersRoundTrips() {
+            Webhook.Ed25519KeyPair pair = Webhook.generateEd25519KeyPair();
+            Map<String, String> h = new Webhook(pair.secretKey(), CLOCK).generateTestHeaders(BODY);
+            assertThat(h.get("webhook-signature")).startsWith("v1a,");
+            assertThat(new Webhook(pair.publicKey(), CLOCK).verify(BODY, h).get("event").asText()).isEqualTo("order.created");
+        }
+
+        @Test
+        void rejectsTheWrongKey() {
+            Webhook other = new Webhook(Webhook.generateEd25519KeyPair().publicKey(), CLOCK);
+            assertThatThrownBy(() -> other.verify(BODY, headers(ID, Long.toString(NOW), "v1a," + SIG)))
+                    .isInstanceOf(WebhookVerificationException.class)
+                    .hasMessage("Webhook signature verification failed");
+        }
+
+        @Test
+        void rejectsATamperedBodyOrId() {
+            Webhook verifier = new Webhook(PK, CLOCK);
+            assertThatThrownBy(() -> verifier.verify(BODY.replace("ord_1", "ord_2"), headers(ID, Long.toString(NOW), "v1a," + SIG)))
+                    .isInstanceOf(WebhookVerificationException.class);
+            assertThatThrownBy(() -> verifier.verify(BODY, headers("msg_other", Long.toString(NOW), "v1a," + SIG)))
+                    .isInstanceOf(WebhookVerificationException.class);
+        }
+
+        @Test
+        void rejectsAnExpiredOrFutureTimestampWithTheSameTolerance() {
+            long old = NOW - 301;
+            String sig = "v1a," + serverSign(SK, ID, old, BODY);
+            Webhook verifier = new Webhook(PK, CLOCK);
+            assertThatThrownBy(() -> verifier.verify(BODY, headers(ID, Long.toString(old), sig)))
+                    .isInstanceOf(WebhookVerificationException.class)
+                    .hasMessageContaining("outside tolerance");
+            long future = NOW + 301;
+            assertThatThrownBy(() -> verifier.verify(BODY, headers(ID, Long.toString(future), "v1a," + serverSign(SK, ID, future, BODY))))
+                    .hasMessageContaining("outside tolerance");
+            // at the edge, and with a custom tolerance
+            long edge = NOW - 300;
+            verifier.verify(BODY, headers(ID, Long.toString(edge), "v1a," + serverSign(SK, ID, edge, BODY)));
+            verifier.verify(BODY, headers(ID, Long.toString(old), sig), Duration.ofSeconds(600));
+        }
+
+        @Test
+        void acceptsAnyMatchingEntryDuringRotation() {
+            Webhook.Ed25519KeyPair previous = Webhook.generateEd25519KeyPair();
+            String header = "v1a," + serverSign(previous.secretKey(), ID, NOW, BODY) + " v1a," + SIG;
+            new Webhook(PK, CLOCK).verify(BODY, headers(ID, Long.toString(NOW), header));
+            new Webhook(previous.publicKey(), CLOCK).verify(BODY, headers(ID, Long.toString(NOW), header));
+        }
+
+        @Test
+        void mixedHeaderEachVerifierPicksItsOwnVersion() {
+            String hmac = "v1," + apiSign(Webhook.decodeSecret(SECRET), ID, NOW, BODY);
+            String mixed = hmac + " v1a," + SIG;
+            Map<String, String> h = headers(ID, Long.toString(NOW), mixed);
+            new Webhook(PK, CLOCK).verify(BODY, h);
+            wh.verify(BODY, h);
+            // A v1 entry never satisfies an Ed25519 verifier, nor a v1a entry an HMAC one.
+            assertThatThrownBy(() -> new Webhook(PK, CLOCK).verify(BODY, headers(ID, Long.toString(NOW), hmac)))
+                    .hasMessage("Webhook signature verification failed");
+            assertThatThrownBy(() -> wh.verify(BODY, headers(ID, Long.toString(NOW), "v1a," + SIG)))
+                    .hasMessage("Webhook signature verification failed");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"v1a,", "v1a,!!!notbase64", "v1a,AAAA", "garbage"})
+        void malformedEntriesDoNotMatch(String sig) {
+            assertThatThrownBy(() -> new Webhook(PK, CLOCK).verify(BODY, headers(ID, Long.toString(NOW), sig)))
+                    .isInstanceOf(WebhookVerificationException.class);
+        }
+
+        @Test
+        void aPublicKeyCannotSign() {
+            Webhook verifier = new Webhook(PK, CLOCK);
+            assertThatThrownBy(() -> verifier.sign(ID, NOW, BODY)).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> verifier.generateTestHeaders(BODY)).isInstanceOf(IllegalStateException.class);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"whpk_", "whpk_AAAA", "whpk_not base64!", "whsk_11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="})
+        void rejectsMalformedKeysWithoutEchoingThem(String key) {
+            assertThatThrownBy(() -> new Webhook(key))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .satisfies(e -> assertThat(e.getMessage()).doesNotContain(key));
+        }
+
+        @Test
+        void hmacVerifierReportsItsScheme() {
+            assertThat(wh.signatureScheme()).isEqualTo(Webhook.SCHEME_HMAC_SHA256);
+        }
     }
 }

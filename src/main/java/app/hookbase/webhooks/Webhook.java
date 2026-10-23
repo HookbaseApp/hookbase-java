@@ -5,12 +5,22 @@ import app.hookbase.internal.Json;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.security.Signature;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -28,6 +38,12 @@ import javax.crypto.spec.SecretKeySpec;
  * webhook-signature} headers. The signature is {@code v1,<base64 HMAC-SHA256>} over
  * {@code "<id>.<timestamp>.<raw body>"}; during a secret rotation the header holds several
  * space-separated signatures and any one matching is enough.
+ *
+ * <p>An endpoint created with {@code signatureScheme("ed25519")} is signed asymmetrically instead
+ * (Standard Webhooks {@code v1a}): each entry is {@code v1a,<base64 Ed25519 signature>} over the same
+ * content, and you verify with the endpoint's public key, {@code whpk_<base64>}, from {@link
+ * app.hookbase.models.Endpoint#publicKey()} or the rotate response. Pass it to the same constructor:
+ * {@code new Webhook("whpk_...")}. Timestamp tolerance and multi-signature handling are identical.
  *
  * <pre>{@code
  * Webhook webhook = new Webhook(System.getenv("HOOKBASE_WEBHOOK_SECRET")); // whsec_...
@@ -58,13 +74,33 @@ public final class Webhook {
     private static final String ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    /** {@link #signatureScheme()} of an HMAC-SHA256 ({@code v1}) verifier. */
+    public static final String SCHEME_HMAC_SHA256 = "hmac-sha256";
+
+    /** {@link #signatureScheme()} of an Ed25519 ({@code v1a}) verifier. */
+    public static final String SCHEME_ED25519 = "ed25519";
+
+    private static final String PUBLIC_KEY_PREFIX = "whpk_";
+    private static final String SECRET_KEY_PREFIX = "whsk_";
+    // DER headers that wrap a raw 32-byte Ed25519 key as X.509 SubjectPublicKeyInfo / PKCS#8 (RFC 8410).
+    private static final byte[] X509_ED25519_PREFIX = HexFormat.of().parseHex("302a300506032b6570032100");
+    private static final byte[] PKCS8_ED25519_PREFIX = HexFormat.of().parseHex("302e020100300506032b657004220420");
+
+    /** HMAC key bytes; {@code null} for an Ed25519 verifier. */
     private final byte[] key;
+    /** Ed25519 public key; {@code null} for an HMAC verifier. */
+    private final PublicKey publicKey;
+    /** Ed25519 private key, set only when constructed from a {@code whsk_} secret key (for tests). */
+    private final PrivateKey privateKey;
     private final Clock clock;
 
     /**
      * @param secret the endpoint's signing secret: {@code whsec_<base64>}, {@code
      *     whsec_op_<base64>} (operational webhooks), a legacy 64-character hex secret, with or
-     *     without the {@code whsec_} prefix
+     *     without the {@code whsec_} prefix. For an Ed25519 ({@code v1a}) endpoint, its public key
+     *     {@code whpk_<base64 32 bytes>}; a {@code whsk_<base64 seed || public key>} secret key is
+     *     also accepted, so {@link #sign} and {@link #generateTestHeaders} can produce {@code v1a}
+     *     signatures in tests. The prefix picks the scheme.
      * @throws IllegalArgumentException if the secret is empty or cannot be decoded
      */
     public Webhook(String secret) {
@@ -76,7 +112,22 @@ public final class Webhook {
         if (secret == null || secret.isBlank()) {
             throw new IllegalArgumentException("Webhook secret is required");
         }
-        this.key = decodeSecret(secret.strip());
+        String s = secret.strip();
+        if (s.startsWith(PUBLIC_KEY_PREFIX)) {
+            this.key = null;
+            this.publicKey = ed25519PublicKey(decodeBase64(s.substring(PUBLIC_KEY_PREFIX.length()), 32, "Ed25519 public key"));
+            this.privateKey = null;
+        } else if (s.startsWith(SECRET_KEY_PREFIX)) {
+            byte[] raw = decodeBase64(s.substring(SECRET_KEY_PREFIX.length()), 64, "Ed25519 secret key");
+            this.key = null;
+            this.privateKey = ed25519PrivateKey(Arrays.copyOfRange(raw, 0, 32));
+            this.publicKey = ed25519PublicKey(Arrays.copyOfRange(raw, 32, 64));
+            Arrays.fill(raw, (byte) 0);
+        } else {
+            this.key = decodeSecret(s);
+            this.publicKey = null;
+            this.privateKey = null;
+        }
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -171,7 +222,8 @@ public final class Webhook {
      * <p><b>Without the timestamp check a captured delivery can be replayed indefinitely.</b> Prefer
      * {@link #verify}.
      *
-     * @throws WebhookVerificationException if no {@code v1} signature in the header matches
+     * @throws WebhookVerificationException if no signature of this verifier's scheme ({@code v1}
+     *     for HMAC, {@code v1a} for Ed25519) in the header matches
      */
     public void verifySignature(String payload, String webhookId, String webhookTimestamp, String webhookSignature) {
         verifySignature(utf8(payload), webhookId, webhookTimestamp, webhookSignature);
@@ -182,31 +234,93 @@ public final class Webhook {
         if (payload == null || webhookId == null || webhookTimestamp == null || webhookSignature == null) {
             throw new WebhookVerificationException("Missing payload or webhook header");
         }
-        byte[] expected = hmac(webhookId + "." + webhookTimestamp + ".", payload);
+        String prefix = webhookId + "." + webhookTimestamp + ".";
+        boolean ed25519 = publicKey != null;
+        byte[] expected = ed25519 ? null : hmac(prefix, payload);
+        String version = ed25519 ? "v1a" : "v1";
         boolean anyParsed = false;
         for (String part : webhookSignature.trim().split(" +")) {
             int comma = part.indexOf(',');
             if (comma <= 0 || comma == part.length() - 1) continue;
             anyParsed = true;
-            if (!part.substring(0, comma).equals("v1")) continue;
+            if (!part.substring(0, comma).equals(version)) continue;
             byte[] actual;
             try {
                 actual = Base64.getDecoder().decode(part.substring(comma + 1));
             } catch (IllegalArgumentException e) {
                 continue;
             }
-            if (MessageDigest.isEqual(expected, actual)) return;
+            if (ed25519 ? ed25519Verify(prefix, payload, actual) : MessageDigest.isEqual(expected, actual)) return;
         }
         if (!anyParsed) throw new WebhookVerificationException("No valid signatures found");
         throw new WebhookVerificationException("Webhook signature verification failed");
     }
 
-    /** {@code v1,<base64 HMAC-SHA256>} of {@code "<id>.<timestamp>.<payload>"}, as Hookbase signs. */
+    /**
+     * {@code v1,<base64 HMAC-SHA256>} of {@code "<id>.<timestamp>.<payload>"}, as Hookbase signs; for
+     * a verifier built from a {@code whsk_} secret key, {@code v1a,<base64 Ed25519 signature>}.
+     *
+     * @throws IllegalStateException if this verifier holds only an Ed25519 public key ({@code
+     *     whpk_}), which cannot sign
+     */
     public String sign(String webhookId, long timestamp, String payload) {
         Objects.requireNonNull(webhookId, "webhookId");
         Objects.requireNonNull(payload, "payload");
-        return "v1," + Base64.getEncoder().encodeToString(
-                hmac(webhookId + "." + timestamp + ".", payload.getBytes(StandardCharsets.UTF_8)));
+        String prefix = webhookId + "." + timestamp + ".";
+        byte[] body = payload.getBytes(StandardCharsets.UTF_8);
+        if (publicKey != null) {
+            if (privateKey == null) {
+                throw new IllegalStateException("An Ed25519 public key (whpk_) can only verify; sign with the whsk_ secret key");
+            }
+            return "v1a," + Base64.getEncoder().encodeToString(ed25519Sign(prefix, body));
+        }
+        return "v1," + Base64.getEncoder().encodeToString(hmac(prefix, body));
+    }
+
+    /**
+     * Which signatures this instance verifies: {@link #SCHEME_HMAC_SHA256} ({@code v1}) or {@link
+     * #SCHEME_ED25519} ({@code v1a}), matching the endpoint's {@code signatureScheme}.
+     */
+    public String signatureScheme() {
+        return publicKey != null ? SCHEME_ED25519 : SCHEME_HMAC_SHA256;
+    }
+
+    /**
+     * A new Ed25519 key pair in the Standard Webhooks serialization Hookbase uses. Hookbase generates
+     * an endpoint's key pair itself and never returns the secret key, so this is for testing: sign
+     * with {@code new Webhook(pair.secretKey())}, verify with {@code new Webhook(pair.publicKey())}.
+     */
+    public static Ed25519KeyPair generateEd25519KeyPair() {
+        KeyPair pair;
+        try {
+            pair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Ed25519 unavailable", e);
+        }
+        byte[] pub = stripPrefix(pair.getPublic().getEncoded(), X509_ED25519_PREFIX, "public");
+        byte[] seed = stripPrefix(pair.getPrivate().getEncoded(), PKCS8_ED25519_PREFIX, "private");
+        byte[] combined = new byte[64];
+        System.arraycopy(seed, 0, combined, 0, 32);
+        System.arraycopy(pub, 0, combined, 32, 32);
+        Base64.Encoder b64 = Base64.getEncoder();
+        String secretKey = SECRET_KEY_PREFIX + b64.encodeToString(combined);
+        Arrays.fill(seed, (byte) 0);
+        Arrays.fill(combined, (byte) 0);
+        return new Ed25519KeyPair(secretKey, PUBLIC_KEY_PREFIX + b64.encodeToString(pub));
+    }
+
+    /**
+     * An Ed25519 key pair from {@link #generateEd25519KeyPair()}.
+     *
+     * @param secretKey {@code whsk_<base64 of the 32-byte seed || 32-byte public key>}
+     * @param publicKey {@code whpk_<base64 of the 32-byte public key>}
+     */
+    public record Ed25519KeyPair(String secretKey, String publicKey) {
+        /** The secret key is printed as {@code <redacted>}. */
+        @Override
+        public String toString() {
+            return "Ed25519KeyPair[secretKey=<redacted>, publicKey=" + publicKey + "]";
+        }
     }
 
     /**
@@ -264,6 +378,80 @@ public final class Webhook {
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("HmacSHA256 unavailable", e);
         }
+    }
+
+    private boolean ed25519Verify(String prefix, byte[] payload, byte[] signature) {
+        if (signature.length != 64) return false;
+        try {
+            Signature verifier = Signature.getInstance("Ed25519");
+            verifier.initVerify(publicKey);
+            verifier.update(prefix.getBytes(StandardCharsets.UTF_8));
+            verifier.update(payload);
+            return verifier.verify(signature);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Ed25519 unavailable", e);
+        } catch (GeneralSecurityException e) {
+            return false;
+        }
+    }
+
+    private byte[] ed25519Sign(String prefix, byte[] payload) {
+        try {
+            Signature signer = Signature.getInstance("Ed25519");
+            signer.initSign(privateKey);
+            signer.update(prefix.getBytes(StandardCharsets.UTF_8));
+            signer.update(payload);
+            return signer.sign();
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("Ed25519 signing failed", e);
+        }
+    }
+
+    private static PublicKey ed25519PublicKey(byte[] raw) {
+        try {
+            return KeyFactory.getInstance("Ed25519").generatePublic(new X509EncodedKeySpec(concat(X509_ED25519_PREFIX, raw)));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalArgumentException("Ed25519 public key is invalid");
+        }
+    }
+
+    private static PrivateKey ed25519PrivateKey(byte[] seed) {
+        byte[] der = concat(PKCS8_ED25519_PREFIX, seed);
+        try {
+            return KeyFactory.getInstance("Ed25519").generatePrivate(new PKCS8EncodedKeySpec(der));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalArgumentException("Ed25519 secret key is invalid");
+        } finally {
+            Arrays.fill(der, (byte) 0);
+            Arrays.fill(seed, (byte) 0);
+        }
+    }
+
+    /** Base64 that must decode to exactly {@code length} bytes. Never echoes the input. */
+    private static byte[] decodeBase64(String b64, int length, String what) {
+        byte[] decoded;
+        try {
+            decoded = Base64.getDecoder().decode(b64);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(what + " is not valid base64");
+        }
+        if (decoded.length != length) {
+            throw new IllegalArgumentException(what + " must be " + length + " bytes, got " + decoded.length);
+        }
+        return decoded;
+    }
+
+    private static byte[] stripPrefix(byte[] der, byte[] prefix, String what) {
+        if (der.length != prefix.length + 32 || !Arrays.equals(der, 0, prefix.length, prefix, 0, prefix.length)) {
+            throw new IllegalStateException("Unexpected Ed25519 " + what + " key encoding");
+        }
+        return Arrays.copyOfRange(der, prefix.length, der.length);
+    }
+
+    private static byte[] concat(byte[] a, byte[] b) {
+        byte[] out = Arrays.copyOf(a, a.length + b.length);
+        System.arraycopy(b, 0, out, a.length, b.length);
+        return out;
     }
 
     /**
