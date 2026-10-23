@@ -44,6 +44,7 @@ class RoutesResourceTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation") // the filters are still sent, though the API ignores them
     void listSendsFiltersAndBindsRoutes() {
         server.enqueue(200, "{\"routes\":[" + ROUTE + "],\"pagination\":{\"total\":1,\"page\":1,\"pageSize\":20}}");
         Page<Route> page = routes.list(new ListRoutesParams().sourceId("src_1").destinationId("dst_1").isActive(true));
