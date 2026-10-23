@@ -6,6 +6,7 @@ import app.hookbase.models.Tunnel;
 import app.hookbase.models.TunnelBulkDeleteResult;
 import app.hookbase.params.CreateTunnelParams;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
 import java.util.Map;
 
@@ -55,6 +56,11 @@ public final class TunnelsResource extends BaseResource {
     }
 
     private static Tunnel tunnel(JsonNode node) {
-        return unwrap(node, node != null && node.has("tunnel") ? "tunnel" : "data", Tunnel.class);
+        String key = node != null && node.has("tunnel") ? "tunnel" : "data";
+        // Create returns the token as auth_token next to a null authToken; keep only the token.
+        if (node != null && node.get(key) instanceof ObjectNode t && t.has("auth_token")) {
+            t.set("authToken", t.remove("auth_token"));
+        }
+        return unwrap(node, key, Tunnel.class);
     }
 }
