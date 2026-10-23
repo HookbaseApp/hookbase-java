@@ -10,7 +10,7 @@ Gradle (Kotlin DSL):
 
 ```kotlin
 dependencies {
-    implementation("app.hookbase:hookbase-java:1.0.0")
+    implementation("app.hookbase:hookbase-java:1.1.0")
 }
 ```
 
@@ -20,7 +20,7 @@ Maven:
 <dependency>
   <groupId>app.hookbase</groupId>
   <artifactId>hookbase-java</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
 </dependency>
 ```
 
@@ -307,6 +307,24 @@ tolerance, or a class to bind the payload: `webhook.verify(body, headers, OrderE
 Take the body as `byte[]`, not `String`: Hookbase sends `application/json` without a charset, and
 servlet containers then decode text as ISO-8859-1, which breaks any non-ASCII payload.
 
+### Ed25519 (v1a) endpoints
+
+An endpoint created with `signatureScheme("ed25519")` is signed asymmetrically (Standard Webhooks
+`v1a`). Hookbase keeps the private key; you verify with the endpoint's public key, `whpk_...`, from
+`endpoint.publicKey()` (or `publicKey()` on the rotate response). Pass it to the same constructor;
+the prefix picks the scheme, and tolerance and rotation handling are the same as for `v1`:
+
+```java
+Endpoint endpoint = hookbase.endpoints().create(appId,
+        new CreateEndpointParams().url("https://example.com/webhooks").signatureScheme("ed25519"));
+
+Webhook webhook = new Webhook(endpoint.publicKey()); // whpk_...
+JsonNode event = webhook.verify(body, headers.toSingleValueMap());
+```
+
+During a key rotation deliveries carry `v1a,<old> v1a,<new>`; keep verifying with the old public
+key (`previousPublicKey()`) until you switch, as either entry matching is enough.
+
 ### Testing Webhooks
 
 Generate test headers for local development:
@@ -318,6 +336,14 @@ String payload = "{\"orderId\":\"test_123\"}";
 Map<String, String> headers = webhook.generateTestHeaders(payload);
 
 // Use these headers to test your webhook handler
+```
+
+For an Ed25519 handler, generate a key pair and sign with its secret key:
+
+```java
+Webhook.Ed25519KeyPair pair = Webhook.generateEd25519KeyPair();
+Map<String, String> headers = new Webhook(pair.secretKey()).generateTestHeaders(payload); // v1a,...
+new Webhook(pair.publicKey()).verify(payload, headers);
 ```
 
 ## Error Handling

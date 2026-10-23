@@ -81,4 +81,13 @@ public final class CreateEndpointParams extends Params<CreateEndpointParams> {
     public CreateEndpointParams circuitCooldownSeconds(int circuitCooldownSeconds) {
         return set("circuitCooldownSeconds", circuitCooldownSeconds);
     }
+
+    /**
+     * {@code hmac-sha256} (Standard Webhooks {@code v1}, the default) or {@code ed25519} ({@code
+     * v1a}). For {@code ed25519} Hookbase generates the key pair and returns only the public key, as
+     * {@link app.hookbase.models.Endpoint#publicKey()}; there is no {@code secret} on the response.
+     */
+    public CreateEndpointParams signatureScheme(String signatureScheme) {
+        return set("signatureScheme", signatureScheme);
+    }
 }

@@ -95,4 +95,15 @@ public final class UpdateEndpointParams extends Params<UpdateEndpointParams> {
     public UpdateEndpointParams circuitCooldownSeconds(int circuitCooldownSeconds) {
         return set("circuitCooldownSeconds", circuitCooldownSeconds);
     }
+
+    /**
+     * Switch the signature scheme: {@code hmac-sha256} ({@code v1}) or {@code ed25519} ({@code v1a}).
+     * A new key is generated and the previous one stops signing at once (no grace period). Switching
+     * to {@code hmac-sha256} returns the new secret this once, as {@link
+     * app.hookbase.models.Endpoint#secret()}; switching to {@code ed25519} returns the new {@link
+     * app.hookbase.models.Endpoint#publicKey()}.
+     */
+    public UpdateEndpointParams signatureScheme(String signatureScheme) {
+        return set("signatureScheme", signatureScheme);
+    }
 }

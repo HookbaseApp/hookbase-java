@@ -28,6 +28,7 @@ class EndpointsResourceTest {
     static final String ENDPOINT = """
             {"id":"ep_1","applicationId":"app_1","url":"https://customer.example.com/hooks","description":"Primary",
              "secretPrefix":"whsec_abcdef...","hasSecret":true,"secretVersion":2,
+             "signatureScheme":"hmac-sha256","publicKey":null,
              "headers":[{"name":"X-Tenant","value":"acme"}],"timeoutSeconds":45,"isDisabled":false,
              "disabledAt":null,"disabledReason":null,"rateLimitPerSecond":25,"successStatusCodes":[200,201,"2xx"],
              "backoffType":"linear","retryDelays":[5,30,300],"ipAllowlistNotes":"egress from 203.0.113.0/24",
@@ -176,6 +177,25 @@ class EndpointsResourceTest {
         assertThat(res.secret()).isNull();
         assertThat(res.publicKey()).isEqualTo("whpk_new");
         assertThat(res.previousPublicKey()).isEqualTo("whpk_old");
+    }
+
+    @Test
+    void createAnEd25519EndpointSendsTheSchemeAndReadsThePublicKey() {
+        String ed = ENDPOINT.replace("\"signatureScheme\":\"hmac-sha256\",\"publicKey\":null", "\"signatureScheme\":\"ed25519\",\"publicKey\":\"whpk_abc\"")
+                .replace("whsec_abcdef...", "whsk_...");
+        server.enqueue(201, "{\"data\":" + ed + "}");
+        Endpoint created = endpoints.create("app_1", new CreateEndpointParams().url("https://customer.example.com/hooks").signatureScheme("ed25519"));
+        assertThat(server.last().rawBody()).isEqualTo("{\"url\":\"https://customer.example.com/hooks\",\"signatureScheme\":\"ed25519\",\"applicationId\":\"app_1\"}");
+        assertThat(created.signatureScheme()).isEqualTo("ed25519");
+        assertThat(created.publicKey()).isEqualTo("whpk_abc");
+        assertThat(created.secret()).isNull();
+
+        server.enqueue(200, "{\"data\":" + ENDPOINT.replace("\"apiKeyId\":null", "\"apiKeyId\":null,\"secret\":\"whsec_new\"") + "}");
+        Endpoint switched = endpoints.update("app_1", "ep_1", new UpdateEndpointParams().signatureScheme("hmac-sha256"));
+        assertThat(server.last().rawBody()).isEqualTo("{\"signatureScheme\":\"hmac-sha256\"}");
+        assertThat(switched.signatureScheme()).isEqualTo("hmac-sha256");
+        assertThat(switched.publicKey()).isNull();
+        assertThat(switched.secret()).isEqualTo("whsec_new");
     }
 
     @Test

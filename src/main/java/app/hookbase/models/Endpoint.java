@@ -12,6 +12,10 @@ import java.util.Map;
  * @param secretPrefix a masked hint of the signing secret: its first twelve characters followed by
  *     {@code ...}, or just {@code whsec_...} / {@code whsk_...} when the secret is stored encrypted
  * @param secretVersion increments on every rotation
+ * @param signatureScheme {@code hmac-sha256} (Standard Webhooks {@code v1}, the default) or {@code
+ *     ed25519} ({@code v1a}); {@code null} from an API that predates the field
+ * @param publicKey the {@code whpk_} Ed25519 public key to verify deliveries with ({@code new
+ *     Webhook(publicKey)}); {@code null} for an HMAC endpoint
  * @param headers custom delivery headers, in the order the API sent them; empty when there are none
  *     (see {@link #headerMap()} for a map view)
  * @param timeoutSeconds per-delivery HTTP timeout in seconds
@@ -36,6 +40,8 @@ public record Endpoint(
         String secretPrefix,
         boolean hasSecret,
         int secretVersion,
+        String signatureScheme,
+        String publicKey,
         List<EndpointHeader> headers,
         int timeoutSeconds,
         boolean isDisabled,
