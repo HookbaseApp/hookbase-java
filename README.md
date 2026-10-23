@@ -437,7 +437,9 @@ See the [examples](./examples/src/main/java/examples) directory for complete exa
 - [Inbound Sources](./examples/src/main/java/examples/InboundSources.java)
 - [Error Handling](./examples/src/main/java/examples/ErrorHandling.java)
 
-Run one with `HOOKBASE_API_KEY=whr_... ./gradlew runExample -Pexample=BasicUsage`.
+Run one with `HOOKBASE_BASE_URL=http://localhost:8787 HOOKBASE_API_KEY=whr_... ./gradlew runExample -Pexample=BasicUsage`.
+`HOOKBASE_BASE_URL` is required: the examples create and delete resources, so they never default to
+the production API. Point it at a local or staging API.
 
 ## License
 

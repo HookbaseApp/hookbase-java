@@ -16,15 +16,22 @@ import java.time.Duration;
  * Every failure is a {@link HookbaseException}; its subclasses say what went wrong.
  *
  * <pre>
- * HOOKBASE_API_KEY=whr_... ./gradlew runExample -Pexample=ErrorHandling
+ * HOOKBASE_BASE_URL=http://localhost:8787 HOOKBASE_API_KEY=whr_... ./gradlew runExample -Pexample=ErrorHandling
  * </pre>
+ *
+ * HOOKBASE_BASE_URL is required: the examples never default to the production API.
  */
 public final class ErrorHandling {
 
     public static void main(String[] args) {
+        String baseUrl = System.getenv("HOOKBASE_BASE_URL");
+        if (baseUrl == null || baseUrl.isBlank()) {
+            System.err.println("Set HOOKBASE_BASE_URL (e.g. http://localhost:8787 or your staging API); the examples never default to production.");
+            System.exit(1);
+        }
         Hookbase hookbase = Hookbase.builder()
                 .apiKey(System.getenv("HOOKBASE_API_KEY"))
-                .baseUrl(System.getenv().getOrDefault("HOOKBASE_BASE_URL", "https://api.hookbase.app"))
+                .baseUrl(baseUrl)
                 .timeout(Duration.ofSeconds(10))
                 .maxRetries(2)
                 .build();
