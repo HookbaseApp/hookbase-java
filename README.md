@@ -393,7 +393,7 @@ Failed requests are retried up to `maxRetries` times (default 3):
 - **500, 502, 503, 504, timeouts and dropped connections** are retried with exponential backoff
   (1 s, 2 s, 4 s ... up to 10 s, plus jitter), for every method except POST. A POST may already
   have been carried out, so it is retried only when sending an event (the API deduplicates on its
-  idempotency key), or when you set `RequestOptions.retries` yourself.
+  idempotency key). Setting `RequestOptions.retries` does not change this.
 - **A connection that was never made** (refused, DNS failure) is always retried.
 - Every other error is thrown straight away.
 

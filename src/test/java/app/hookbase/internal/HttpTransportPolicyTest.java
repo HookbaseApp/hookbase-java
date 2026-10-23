@@ -105,7 +105,7 @@ class HttpTransportPolicyTest {
         server.enqueue(429, "{\"error\":\"slow down\"}", Map.of("Retry-After", "0"))
                 .enqueue(503, "{}")
                 .enqueue(200, "{\"ok\":true}");
-        transport(2).request("POST", "/api/things", null, Map.of(), new RequestOptions(null, 2, null));
+        transport(2).request("GET", "/api/things", null, null, new RequestOptions(null, 2, null));
         assertThat(sleeps.getFirst()).isEqualTo(Duration.ZERO);
         assertThat(sleeps).hasSize(2);
     }

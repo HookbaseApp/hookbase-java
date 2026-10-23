@@ -55,7 +55,7 @@ import java.util.regex.Pattern;
  *       ({@code min(1s·2^n, 10s)} plus up to 1 s of jitter), except on a POST: it may already have
  *       been carried out, and repeating it can create the thing twice (or rotate a secret twice).
  *       A POST is retried only when the API deduplicates it, which is sending an event with an
- *       {@code Idempotency-Key}, or when {@link RequestOptions#retries()} is set explicitly.
+ *       {@code Idempotency-Key}. Setting {@link RequestOptions#retries()} does not change this.
  *   <li>A connection that was never established (refused, DNS failure, connect timeout) is always
  *       retried, POST included: the request never reached the server.
  *   <li>Every other status is the API's answer and is thrown straight away.
@@ -134,8 +134,7 @@ public final class HttpTransport implements ApiClient {
         String upper = method.toUpperCase(Locale.ROOT);
         String idempotencyKey = opts.idempotencyKey();
         boolean retryAmbiguousFailures = !upper.equals("POST")
-                || (idempotencyKey != null && !idempotencyKey.isEmpty() && IDEMPOTENT_POST_PATHS.contains(path))
-                || opts.retries() != null;
+                || (idempotencyKey != null && !idempotencyKey.isEmpty() && IDEMPOTENT_POST_PATHS.contains(path));
         int retries = opts.retries() != null ? opts.retries() : maxRetries;
         Duration requestTimeout = opts.timeout() != null ? opts.timeout() : timeout;
 

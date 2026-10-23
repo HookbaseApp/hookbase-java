@@ -66,8 +66,8 @@ public final class DlqResource extends BaseResource {
 
     /**
      * Retry one DLQ message. The retry is a new outbound message, whose id is
-     * {@link MessageReplayResult#newMessageId()}. Not retried automatically after a timeout or 5xx
-     * unless you set {@link RequestOptions#retries()}.
+     * {@link MessageReplayResult#newMessageId()}. Not retried after a timeout or 5xx, since a retry
+     * that did go through would otherwise be delivered twice.
      */
     public MessageReplayResult retry(String id, RequestOptions options) {
         return unwrap(post(PATH + "/" + seg(id) + "/retry", null, options), "data", MessageReplayResult.class);

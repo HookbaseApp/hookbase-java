@@ -141,8 +141,8 @@ public final class MessagesResource extends BaseResource {
      * Replay an exhausted, DLQ or stalled failed outbound message. The replay is a NEW outbound
      * message, whose id is {@link MessageReplayResult#newMessageId()}.
      *
-     * <p>Not retried automatically after a timeout or 5xx unless you set {@link
-     * RequestOptions#retries()}: a replay that did go through would otherwise be delivered twice.
+     * <p>Not retried after a timeout or 5xx: a replay that did go through would otherwise be
+     * delivered twice.
      */
     public MessageReplayResult retry(String applicationId, String outboundMessageId, RequestOptions options) {
         return unwrap(post(PATH + "/" + seg(outboundMessageId) + "/replay", null, options), "data", MessageReplayResult.class);
