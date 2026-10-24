@@ -272,6 +272,10 @@ Destinations, routes, events, deliveries, transforms, filters, schemas, analytic
 tunnels and cron jobs follow the same pattern; see the javadoc of each resource class, and
 [examples/InboundSources.java](./examples/src/main/java/examples/InboundSources.java).
 
+The sources, destinations and routes lists are paged (`page`, `pageSize`) but not filtered by the
+API yet, so their `search`, `provider`, `isActive`, `sourceId` and `destinationId` setters are
+deprecated: the list comes back unfiltered, and you filter the items yourself.
+
 ## Webhook Verification
 
 Verify incoming webhooks in your application. Always verify the **raw bytes** of the body: JSON
@@ -383,12 +387,13 @@ try {
 
 Failed requests are retried up to `maxRetries` times (default 3):
 
-- **429** is retried after the `Retry-After` the API sends, when it is 60 seconds or less. A 429
-  without one (a plan or monthly quota) is thrown at once.
+- **429** is retried for every method, POST included (the API refused it, so nothing ran), after
+  the `Retry-After` the API sends, when it is 60 seconds or less. A 429 without one (a plan or
+  monthly quota) is thrown at once, with `retryAfter()` returning `null`.
 - **500, 502, 503, 504, timeouts and dropped connections** are retried with exponential backoff
   (1 s, 2 s, 4 s ... up to 10 s, plus jitter), for every method except POST. A POST may already
   have been carried out, so it is retried only when sending an event (the API deduplicates on its
-  idempotency key), or when you set `RequestOptions.retries` yourself.
+  idempotency key). Setting `RequestOptions.retries` does not change this.
 - **A connection that was never made** (refused, DNS failure) is always retried.
 - Every other error is thrown straight away.
 
@@ -432,7 +437,9 @@ See the [examples](./examples/src/main/java/examples) directory for complete exa
 - [Inbound Sources](./examples/src/main/java/examples/InboundSources.java)
 - [Error Handling](./examples/src/main/java/examples/ErrorHandling.java)
 
-Run one with `HOOKBASE_API_KEY=whr_... ./gradlew runExample -Pexample=BasicUsage`.
+Run one with `HOOKBASE_BASE_URL=http://localhost:8787 HOOKBASE_API_KEY=whr_... ./gradlew runExample -Pexample=BasicUsage`.
+`HOOKBASE_BASE_URL` is required: the examples create and delete resources, so they never default to
+the production API. Point it at a local or staging API.
 
 ## License
 

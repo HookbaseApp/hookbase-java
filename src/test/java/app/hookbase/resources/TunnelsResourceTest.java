@@ -51,9 +51,12 @@ class TunnelsResourceTest {
         assertThat(tunnels.get("tun_1").subdomain()).isEqualTo("brave-otter-1a2b");
         assertThat(server.last().path()).isEqualTo("/api/tunnels/tun_1");
 
-        // Create sends the one-time token as auth_token.
-        server.enqueue(201, "{\"tunnel\":{\"id\":\"tun_2\",\"name\":\"dev\",\"subdomain\":\"my-sub\",\"status\":\"disconnected\","
-                + "\"allowedHosts\":null,\"auth_token\":\"tok_123\"},\"tunnelUrl\":\"https://x/t/my-sub\",\"wsUrl\":\"wss://x\"}");
+        // Create sends the one-time token as auth_token, next to the null authToken every tunnel row has.
+        server.enqueue(201, "{\"tunnel\":{\"id\":\"tun_2\",\"organizationId\":\"org_1\",\"userId\":null,\"name\":\"dev\","
+                + "\"subdomain\":\"my-sub\",\"localPort\":null,\"status\":\"disconnected\",\"authToken\":null,"
+                + "\"createdAt\":\"2026-10-23T00:00:00Z\",\"lastConnectedAt\":null,\"lastRequestAt\":null,\"totalRequests\":0,"
+                + "\"customDomainId\":null,\"direction\":\"inbound\",\"allowedHosts\":null,\"auth_token\":\"tok_123\"},"
+                + "\"tunnelUrl\":\"https://x/t/my-sub\",\"wsUrl\":\"wss://x\"}");
         Tunnel created = tunnels.create(new CreateTunnelParams().name("dev").subdomain("my-sub").direction("inbound")
                 .allowedHosts(List.of("a.example.com")));
         assertThat(server.last().method()).isEqualTo("POST");

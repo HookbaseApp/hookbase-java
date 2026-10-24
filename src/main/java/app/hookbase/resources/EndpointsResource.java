@@ -110,9 +110,8 @@ public final class EndpointsResource extends BaseResource {
      * until {@code previousSecretExpiresAt} (one hour unless {@code gracePeriodSeconds} says
      * otherwise).
      *
-     * <p>Not retried automatically after a timeout or 5xx unless you set
-     * {@link RequestOptions#retries()}: a rotation that did go through and is then repeated replaces
-     * the secret you were just handed.
+     * <p>Not retried after a timeout or 5xx: a rotation that did go through and is then repeated
+     * replaces the secret you were just handed.
      */
     public EndpointRotateSecretResult rotateSecret(
             String applicationId, String endpointId, RotateEndpointSecretParams params, RequestOptions options) {

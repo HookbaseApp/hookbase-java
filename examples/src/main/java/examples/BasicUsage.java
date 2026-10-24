@@ -20,17 +20,23 @@ import java.util.Map;
  * endpoint, send an event, and read the delivery attempts.
  *
  * <pre>
- * HOOKBASE_API_KEY=whr_... ./gradlew runExample -Pexample=BasicUsage
+ * HOOKBASE_BASE_URL=http://localhost:8787 HOOKBASE_API_KEY=whr_... ./gradlew runExample -Pexample=BasicUsage
  * </pre>
  *
- * Set HOOKBASE_BASE_URL to point at another API (e.g. http://localhost:8787).
+ * HOOKBASE_BASE_URL is required: this example creates and deletes resources, so it never defaults
+ * to the production API.
  */
 public final class BasicUsage {
 
     public static void main(String[] args) throws InterruptedException {
+        String baseUrl = System.getenv("HOOKBASE_BASE_URL");
+        if (baseUrl == null || baseUrl.isBlank()) {
+            System.err.println("Set HOOKBASE_BASE_URL (e.g. http://localhost:8787 or your staging API); the examples never default to production.");
+            System.exit(1);
+        }
         Hookbase hookbase = Hookbase.builder()
                 .apiKey(System.getenv("HOOKBASE_API_KEY"))
-                .baseUrl(System.getenv().getOrDefault("HOOKBASE_BASE_URL", "https://api.hookbase.app"))
+                .baseUrl(baseUrl)
                 .build();
 
         String suffix = Long.toString(System.currentTimeMillis(), 36);

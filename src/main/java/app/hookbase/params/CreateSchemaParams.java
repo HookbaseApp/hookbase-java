@@ -6,6 +6,11 @@ public final class CreateSchemaParams extends Params<CreateSchemaParams> {
         return set("name", name);
     }
 
+    /**
+     * @deprecated The API ignores this: it derives the slug from {@code name} (lower-cased, with
+     *     runs of other characters replaced by {@code -}). Set the name you want the slug built from.
+     */
+    @Deprecated
     public CreateSchemaParams slug(String slug) {
         return set("slug", slug);
     }

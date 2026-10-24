@@ -20,6 +20,14 @@ public final class AnalyticsDashboardParams extends Params<AnalyticsDashboardPar
         return set("sourceId", sourceId);
     }
 
+    /**
+     * IANA time zone the timeline is bucketed in, such as {@code Europe/Berlin} (sent as {@code
+     * tz}). Default UTC; a name the API doesn't recognise falls back to UTC.
+     */
+    public AnalyticsDashboardParams timeZone(String timeZone) {
+        return set("tz", timeZone);
+    }
+
     /** Scope the dashboard to one destination. */
     public AnalyticsDashboardParams destinationId(String destinationId) {
         return set("destinationId", destinationId);

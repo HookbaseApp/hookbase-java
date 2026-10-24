@@ -12,10 +12,20 @@ public final class ListDestinationsParams extends Params<ListDestinationsParams>
         return set("pageSize", pageSize);
     }
 
+    /**
+     * @deprecated The API does not filter destinations by this yet: the list comes back unfiltered, so
+     *     filter the returned items yourself.
+     */
+    @Deprecated
     public ListDestinationsParams search(String search) {
         return set("search", search);
     }
 
+    /**
+     * @deprecated The API does not filter destinations by this yet: the list comes back unfiltered, so
+     *     filter the returned items yourself.
+     */
+    @Deprecated
     public ListDestinationsParams isActive(boolean isActive) {
         return set("isActive", isActive);
     }

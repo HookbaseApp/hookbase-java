@@ -47,6 +47,7 @@ class DestinationsResourceTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation") // the filters are still sent, though the API ignores them
     void listSendsFiltersAndBindsDestinations() {
         server.enqueue(200, "{\"destinations\":[" + DEST + "],\"pagination\":{\"total\":1,\"page\":1,\"pageSize\":20}}");
         Page<Destination> page = destinations.list(new ListDestinationsParams().search("my").isActive(true));

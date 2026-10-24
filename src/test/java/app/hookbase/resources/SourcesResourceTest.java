@@ -49,6 +49,7 @@ class SourcesResourceTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation") // the filters are still sent, though the API ignores them
     void listSendsFiltersAndMapsNumberedPagination() {
         server.enqueue(200, "{\"sources\":[" + SOURCE + "," + SOURCE + "],\"pagination\":{\"total\":5,\"page\":1,\"pageSize\":2}}");
         Page<Source> page = sources.list(new ListSourcesParams().page(1).pageSize(2).search("git").provider("github").isActive(true));
@@ -86,6 +87,7 @@ class SourcesResourceTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation")
     void listAllWalksPagesKeepingFiltersAndPageSize() {
         server.enqueue(200, "{\"sources\":[{\"id\":\"src_1\"},{\"id\":\"src_2\"}],\"pagination\":{\"total\":3,\"page\":1,\"pageSize\":2}}");
         server.enqueue(200, "{\"sources\":[{\"id\":\"src_3\"}],\"pagination\":{\"total\":3,\"page\":2,\"pageSize\":2}}");

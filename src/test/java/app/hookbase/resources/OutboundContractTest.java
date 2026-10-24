@@ -191,12 +191,13 @@ class OutboundContractTest {
     }
 
     @Test
-    void stillRetriesAPostWhenTheCallerAsksForRetriesExplicitly() {
+    void doesNotRetryAPostOnA5xxEvenWhenTheCallerPassesRetries() {
         server.enqueue(503, "{\"error\":\"boom\"}")
                 .enqueue(201, "{\"data\":{\"originalMessageId\":\"a\",\"newMessageId\":\"b\",\"status\":\"queued\"}}");
         DlqResource dlq = new DlqResource(OutboundTestSupport.transport(server, 0));
-        assertThat(dlq.retry("a", RequestOptions.builder().retries(1).build()).newMessageId()).isEqualTo("b");
-        assertThat(server.requests()).hasSize(2);
+        assertThatThrownBy(() -> dlq.retry("a", RequestOptions.builder().retries(1).build()))
+                .isInstanceOf(HookbaseApiException.class);
+        assertThat(server.requests()).hasSize(1);
     }
 
     @Test

@@ -185,14 +185,15 @@ class HttpTransportTest {
     }
 
     @Test
-    void postWithIdempotencyKeyOrExplicitRetriesIsRetried() {
+    void postWithIdempotencyKeyIsRetriedButExplicitRetriesAloneIsNot() {
         server.enqueue(503, "{}").enqueue(200, "{}");
         transport().request("POST", "/api/send-event", null, Map.of(), RequestOptions.builder().idempotencyKey("k").build());
         assertThat(server.requests()).hasSize(2);
 
         server.enqueue(503, "{}").enqueue(200, "{}");
-        transport().request("POST", "/api/x", null, Map.of(), RequestOptions.builder().retries(1).build());
-        assertThat(server.requests()).hasSize(4);
+        assertThatThrownBy(() -> transport().request("POST", "/api/x", null, Map.of(), RequestOptions.builder().retries(1).build()))
+                .isInstanceOf(HookbaseApiException.class);
+        assertThat(server.requests()).hasSize(3);
     }
 
     @Test

@@ -26,4 +26,9 @@ public final class UpdateTransformParams extends Params<UpdateTransformParams> {
     public UpdateTransformParams outputFormat(String outputFormat) {
         return set("outputFormat", outputFormat);
     }
+
+    /** Turn the transform on or off. */
+    public UpdateTransformParams isActive(boolean isActive) {
+        return set("isActive", isActive);
+    }
 }
