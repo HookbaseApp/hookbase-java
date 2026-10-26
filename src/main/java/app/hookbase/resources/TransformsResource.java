@@ -13,7 +13,7 @@ import app.hookbase.params.UpdateTransformParams;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Inbound payload transforms (JSONata, Liquid, XSLT, JavaScript). */
+/** Inbound payload transforms (JSONata, JavaScript, TypeScript, Liquid, XSLT, JMESPath, JSON Logic, jq). */
 public final class TransformsResource extends BaseResource {
 
     private static final String PATH = "/api/transforms";

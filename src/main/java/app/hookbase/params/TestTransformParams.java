@@ -2,7 +2,7 @@ package app.hookbase.params;
 
 /** Body for {@code transforms().test()}. {@code code} and {@code payload} are required. */
 public final class TestTransformParams extends Params<TestTransformParams> {
-    /** {@code jsonata} (default), {@code liquid}, {@code xslt} or {@code javascript}. */
+    /** {@code jsonata} (default), {@code javascript}, {@code typescript}, {@code liquid}, {@code xslt}, {@code jmespath}, {@code jsonlogic} or {@code jq}. {@code jq} needs transform isolation on the server. */
     public TestTransformParams transformType(String transformType) {
         return set("transformType", transformType);
     }
