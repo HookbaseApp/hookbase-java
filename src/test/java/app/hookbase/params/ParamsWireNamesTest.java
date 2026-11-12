@@ -34,7 +34,7 @@ class ParamsWireNamesTest {
     static Stream<Arguments> params() {
         return Stream.of(
                 // inbound
-                of(CreateSourceParams.class, "allowedMethods dedupCustomHeader dedupEnabled dedupStrategy dedupWindowHours description encryptFields ipAllowlist ipDenylist ipFilterMode maskFields name provider rateLimitPerMinute rejectInvalidSignatures signingSecret slug transientMode verifyToken"),
+                of(CreateSourceParams.class, "allowedMethods catalogProvider dedupCustomHeader dedupEnabled dedupStrategy dedupWindowHours description encryptFields ipAllowlist ipDenylist ipFilterMode maskFields name provider rateLimitPerMinute rejectInvalidSignatures signingSecret slug transientMode verifyToken"),
                 of(UpdateSourceParams.class, "allowedMethods dedupCustomHeader dedupEnabled dedupStrategy dedupWindowHours description encryptFields ipAllowlist ipDenylist ipFilterMode isActive maskFields name provider rateLimitPerMinute rejectInvalidSignatures signingSecret transientMode verifyToken"),
                 // search/provider/isActive are deprecated: sent, but the API's list reads only page and pageSize.
                 of(ListSourcesParams.class, "isActive page pageSize provider search"),

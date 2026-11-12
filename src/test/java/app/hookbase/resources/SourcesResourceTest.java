@@ -233,4 +233,45 @@ class SourcesResourceTest {
         assertThat(server.last().path()).isEqualTo("/api/sources/bulk");
         assertThat(server.last().body()).isEqualTo(MockServer.json("{\"ids\":[\"src_1\",\"src_2\",\"src_3\"]}"));
     }
+
+    @Test
+    void createSendsCatalogProviderAndEveryReadCarriesIt() {
+        server.enqueue(201, "{\"source\":{\"id\":\"src_new\",\"provider\":\"custom\",\"catalogProvider\":\"salesforce\"}}");
+        SourceWithSecret created = sources.create(new CreateSourceParams().name("SF").slug("sf")
+                .provider("custom").catalogProvider("salesforce"));
+
+        assertThat(server.last().body()).isEqualTo(MockServer.json(
+                "{\"name\":\"SF\",\"slug\":\"sf\",\"provider\":\"custom\",\"catalogProvider\":\"salesforce\"}"));
+        assertThat(created.catalogProvider()).isEqualTo("salesforce");
+        assertThat(created.toSource().catalogProvider()).isEqualTo("salesforce");
+
+        server.enqueue(200, "{\"source\":" + SOURCE + "}");
+        assertThat(sources.get("src_1").catalogProvider()).isNull();
+    }
+
+    /**
+     * The API used to send these list fields as JSON text ("[\"a\",\"b\"]"), which bound as a
+     * one-element list holding the whole string. It sends real arrays now; each must bind entry by
+     * entry, on list and on get.
+     */
+    @Test
+    void listFieldsWithSeveralEntriesBindAsRealLists() {
+        String source = """
+                {"id":"src_1","ipFilterMode":"both","ipAllowlist":["203.0.113.0/24","198.51.100.7"],
+                 "ipDenylist":["192.0.2.1","192.0.2.2"],"encryptFields":["$.ssn","$.card.number"],
+                 "maskFields":["$.email","$.phone"],"allowedMethods":["POST","PUT"]}""";
+        server.enqueue(200, "{\"sources\":[" + source + "],\"pagination\":{\"total\":1,\"page\":1,\"pageSize\":20}}");
+        server.enqueue(200, "{\"source\":" + source + "}");
+
+        for (Source s : List.of(sources.list().data().getFirst(), sources.get("src_1"))) {
+            assertThat(s.ipAllowlist()).containsExactly("203.0.113.0/24", "198.51.100.7");
+            assertThat(s.ipDenylist()).containsExactly("192.0.2.1", "192.0.2.2");
+            assertThat(s.encryptFields()).containsExactly("$.ssn", "$.card.number");
+            assertThat(s.maskFields()).containsExactly("$.email", "$.phone");
+            assertThat(s.allowedMethods()).containsExactly("POST", "PUT");
+            for (List<String> list : List.of(s.ipAllowlist(), s.ipDenylist(), s.encryptFields(), s.maskFields(), s.allowedMethods())) {
+                assertThat(list).noneMatch(entry -> entry.startsWith("["));
+            }
+        }
+    }
 }

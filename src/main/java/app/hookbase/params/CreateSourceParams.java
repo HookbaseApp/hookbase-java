@@ -114,4 +114,15 @@ public final class CreateSourceParams extends Params<CreateSourceParams> {
     public CreateSourceParams allowedMethods(List<String> allowedMethods) {
         return set("allowedMethods", allowedMethods);
     }
+
+    /**
+     * The provider-catalog entry this source is made from: an id from
+     * {@code GET /api/catalog/providers} (at most 100 characters; anything else is a 400). The
+     * dashboard's source templates set it. It is recorded on the source and cannot be changed later.
+     * It tells a bridge destination that the sender is the vendor, whose addresses every customer
+     * shares, so the source's IP allowlist does not count as verifying who sent an event.
+     */
+    public CreateSourceParams catalogProvider(String catalogProvider) {
+        return set("catalogProvider", catalogProvider);
+    }
 }
