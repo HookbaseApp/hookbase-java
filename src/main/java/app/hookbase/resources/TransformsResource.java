@@ -5,6 +5,7 @@ import app.hookbase.Page;
 import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
 import app.hookbase.models.Transform;
+import app.hookbase.models.TransformEngines;
 import app.hookbase.models.TransformTestResult;
 import app.hookbase.params.CreateTransformParams;
 import app.hookbase.params.ListTransformsParams;
@@ -13,7 +14,7 @@ import app.hookbase.params.UpdateTransformParams;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Inbound payload transforms (JSONata, Liquid, XSLT, JavaScript). */
+/** Inbound payload transforms (JSONata, JavaScript, TypeScript, Liquid, XSLT, JMESPath, JSON Logic, jq). */
 public final class TransformsResource extends BaseResource {
 
     private static final String PATH = "/api/transforms";
@@ -86,6 +87,18 @@ public final class TransformsResource extends BaseResource {
 
     public void delete(String id) {
         delete(id, null);
+    }
+
+    /**
+     * The transform languages the API supports, each with starter code and whether this
+     * deployment runs it, and the content formats a transform reads and writes.
+     */
+    public TransformEngines engines(RequestOptions options) {
+        return as(get(PATH + "/engines", null, options), TransformEngines.class);
+    }
+
+    public TransformEngines engines() {
+        return engines(null);
     }
 
     /** Run transform code against a sample payload without saving it. A transform that fails is reported in the result, not thrown. */

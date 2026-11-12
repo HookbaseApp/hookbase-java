@@ -15,7 +15,7 @@ public final class CreateTransformParams extends Params<CreateTransformParams> {
         return set("description", description);
     }
 
-    /** {@code jsonata} (default), {@code liquid}, {@code xslt} or {@code javascript}. */
+    /** {@code jsonata} (default), {@code javascript}, {@code typescript}, {@code liquid}, {@code xslt}, {@code jmespath}, {@code jsonlogic} or {@code jq}. {@code jq} needs transform isolation on the server. */
     public CreateTransformParams transformType(String transformType) {
         return set("transformType", transformType);
     }

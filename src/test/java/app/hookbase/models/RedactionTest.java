@@ -22,6 +22,10 @@ class RedactionTest {
         assertThat(read("{\"id\":\"e1\",\"secret\":\"whsec_xyz\"}", Endpoint.class).toString()).doesNotContain("whsec_xyz");
         assertThat(read("{\"secret\":\"whsec_new\",\"secretVersion\":2}", EndpointRotateSecretResult.class).toString())
                 .doesNotContain("whsec_new").contains("secretVersion=2");
+        assertThat(read("{\"id\":\"d1\",\"hasSigningSecret\":true,\"signingSecret\":\"whsec_dest\"}", Destination.class).toString())
+                .doesNotContain("whsec_dest").contains("signingSecret=<redacted>").contains("hasSigningSecret=true");
+        assertThat(read("{\"signingSecret\":\"whsec_rot\",\"previousSecretExpiresAt\":\"2026-11-11T01:00:00Z\"}", DestinationSecret.class).toString())
+                .doesNotContain("whsec_rot").contains("previousSecretExpiresAt=2026-11-11T01:00:00Z");
         assertThat(read("{\"id\":\"t1\",\"token\":\"pt_live\"}", PortalToken.class).toString()).doesNotContain("pt_live");
         assertThat(read("{\"id\":\"t1\",\"auth_token\":\"tun_tok\"}", Tunnel.class).toString()).doesNotContain("tun_tok");
         assertThat(read("{\"curlCommand\":\"curl -H 'Authorization: Bearer x'\"}", EventDebugCommands.class).toString())
@@ -42,6 +46,8 @@ class RedactionTest {
 
         assertThat(read("{\"headers\":{\"webhook-signature\":\"v1,sig\",\"content-type\":\"application/json\"}}", EventDebugRequest.class).toString())
                 .doesNotContain("v1,sig").contains("content-type=application/json");
+        assertThat(read("{\"id\":\"del_1\",\"responseHeaders\":{\"set-cookie\":\"sid=s3cr3t\",\"content-type\":\"text/plain\"}}",
+                EventDebugDelivery.class).toString()).doesNotContain("s3cr3t").contains("content-type=text/plain");
         assertThat(new EndpointHeader("X-Api-Key", "k123").toString()).doesNotContain("k123");
         assertThat(new EndpointHeader("X-Tenant", "acme").toString()).contains("acme");
     }

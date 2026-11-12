@@ -7,7 +7,8 @@ import java.util.Map;
 
 /**
  * Body for {@code destinations().create()}. {@code name} is required, and {@code url} for
- * {@code http} destinations.
+ * {@code http} destinations. A {@code bridge} destination takes a {@code config} and no
+ * {@code url}, {@code headers}, {@code authType} or {@code useStaticIp}.
  */
 public final class CreateDestinationParams extends Params<CreateDestinationParams> {
     public CreateDestinationParams name(String name) {
@@ -26,14 +27,15 @@ public final class CreateDestinationParams extends Params<CreateDestinationParam
 
     /**
      * {@code http} (the default), a queue ({@code sqs}, {@code eventbridge}, {@code servicebus},
-     * {@code pubsub}, {@code oci_queue}) or a warehouse ({@code s3}, {@code r2}, {@code gcs},
-     * {@code azure_blob}).
+     * {@code pubsub}, {@code oci_queue}), a warehouse ({@code s3}, {@code r2}, {@code gcs},
+     * {@code azure_blob}) or {@code bridge}, which publishes each delivery as an outbound event
+     * (configure it with {@link app.hookbase.models.BridgeConfig}).
      */
     public CreateDestinationParams type(String type) {
         return set("type", type);
     }
 
-    /** Required for {@code http}; queue and warehouse destinations leave it unset. */
+    /** Required for {@code http}; queue, warehouse and bridge destinations leave it unset. */
     public CreateDestinationParams url(String url) {
         return set("url", url);
     }
@@ -73,7 +75,8 @@ public final class CreateDestinationParams extends Params<CreateDestinationParam
      * {@code bucket}, {@code projectId}, {@code serviceAccountKey}; for {@code azure_blob}
      * {@code accountName}, {@code accountKey}, {@code containerName}; warehouses also take
      * {@code prefix}, {@code fileFormat} ({@code json}/{@code jsonl}) and {@code partitionBy}
-     * ({@code date}/{@code hour}/{@code source}).
+     * ({@code date}/{@code hour}/{@code source}). For {@code bridge}, pass
+     * {@link app.hookbase.models.BridgeConfig#toMap()}.
      */
     public CreateDestinationParams config(Map<String, ?> config) {
         return set("config", config);

@@ -13,6 +13,8 @@ import java.util.Map;
  *     after registration ({@code awaitingSigningSecret}), or the provider does not sign
  * @param verifyToken Meta providers ({@code whatsapp}) only: the verify token to paste into Meta's
  *     webhook setup, in full, this once; {@code sources().verifyToken()} reveals it later
+ * @param catalogProvider the provider-catalog entry the source was created from; see
+ *     {@link Source#catalogProvider()}
  */
 public record SourceWithSecret(
         String id,
@@ -46,7 +48,8 @@ public record SourceWithSecret(
         String createdAt,
         String updatedAt,
         String signingSecret,
-        String verifyToken) {
+        String verifyToken,
+        String catalogProvider) {
 
     public SourceWithSecret {
         ipAllowlist = ipAllowlist == null ? List.of() : List.copyOf(ipAllowlist);
@@ -62,7 +65,7 @@ public record SourceWithSecret(
                 verifiesWithoutSecret, awaitingSigningSecret, rejectInvalidSignatures, rateLimitPerMinute, isActive,
                 customDomainId, ipFilterMode, ipAllowlist, ipDenylist, encryptFields, maskFields, dedupEnabled,
                 dedupStrategy, dedupWindowHours, dedupCustomHeader, transientMode, allowedMethods, eventCount,
-                routeCount, ingestUrl, createdAt, updatedAt);
+                routeCount, ingestUrl, createdAt, updatedAt, catalogProvider);
     }
 
     /** Credentials are printed as {@code <redacted>}, so logging this record is safe. */

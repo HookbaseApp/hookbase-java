@@ -46,20 +46,23 @@ class SourceContractTest {
 
     /**
      * The fields POST /api/sources accepts: api/src/__tests__/unit/source-schema-strict.test.ts,
-     * SDK_CREATE_FIELDS plus API_ONLY_FIELDS (verifyToken, which node, python and go also send).
+     * SDK_CREATE_FIELDS plus API_ONLY_CREATE_FIELDS (catalogProvider, create only).
      * The schema is strict, so a key outside this set is a 400.
      */
     static final Set<String> API_SOURCE_CREATE_FIELDS = Set.of(
             "name", "slug", "provider", "description", "signingSecret", "rejectInvalidSignatures",
             "rateLimitPerMinute", "ipFilterMode", "ipAllowlist", "ipDenylist", "encryptFields",
             "maskFields", "dedupEnabled", "dedupStrategy", "dedupWindowHours", "dedupCustomHeader",
-            "transientMode", "allowedMethods", "verifyToken");
+            "transientMode", "allowedMethods", "verifyToken", "catalogProvider");
+
+    /** Fields only create takes: the slug is part of the ingest URL, and catalogProvider is fixed once recorded. */
+    static final List<String> CREATE_ONLY_SOURCE_FIELDS = List.of("catalogProvider", "slug");
 
     static final Set<String> API_SOURCE_UPDATE_FIELDS;
 
     static {
         Set<String> update = new HashSet<>(API_SOURCE_CREATE_FIELDS);
-        update.remove("slug");
+        update.removeAll(CREATE_ONLY_SOURCE_FIELDS);
         update.add("isActive");
         API_SOURCE_UPDATE_FIELDS = Set.copyOf(update);
     }
@@ -113,10 +116,10 @@ class SourceContractTest {
     }
 
     @Test
-    void createAndUpdateDifferOnlyBySlugAndIsActive() {
+    void createAndUpdateDifferOnlyBySlugCatalogProviderAndIsActive() {
         Set<String> create = everyKeySent(new CreateSourceParams());
         Set<String> update = everyKeySent(new UpdateSourceParams());
-        assertThat(create.stream().filter(k -> !update.contains(k)).toList()).containsExactly("slug");
+        assertThat(create.stream().filter(k -> !update.contains(k)).toList()).containsExactlyElementsOf(CREATE_ONLY_SOURCE_FIELDS);
         assertThat(update.stream().filter(k -> !create.contains(k)).toList()).containsExactly("isActive");
     }
 

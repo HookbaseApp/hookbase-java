@@ -10,7 +10,7 @@ public final class UpdateTransformParams extends Params<UpdateTransformParams> {
         return set("description", description);
     }
 
-    /** {@code jsonata}, {@code liquid}, {@code xslt} or {@code javascript}. */
+    /** {@code jsonata}, {@code javascript}, {@code typescript}, {@code liquid}, {@code xslt}, {@code jmespath}, {@code jsonlogic} or {@code jq}. */
     public UpdateTransformParams transformType(String transformType) {
         return set("transformType", transformType);
     }

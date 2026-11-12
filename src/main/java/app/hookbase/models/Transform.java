@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonAlias;
 /**
  * A payload transform.
  *
- * @param transformType {@code jsonata}, {@code liquid}, {@code xslt} or {@code javascript}
+ * @param transformType {@code jsonata}, {@code javascript}, {@code typescript}, {@code liquid}, {@code xslt}, {@code jmespath}, {@code jsonlogic} or {@code jq}
  * @param inputFormat {@code json}, {@code xml} or {@code text}
  * @param outputFormat {@code json}, {@code xml} or {@code text}
  */

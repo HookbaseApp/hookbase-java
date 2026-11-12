@@ -76,7 +76,9 @@ public final class MessagesResource extends BaseResource {
         List<SendMessageEndpoint> endpoints = list(data, "endpoints", SendMessageEndpoint.class);
         int queued = data != null && data.hasNonNull("messagesQueued") ? data.get("messagesQueued").asInt() : endpoints.size();
         String eventId = data != null && data.hasNonNull("eventId") ? data.get("eventId").asText() : null;
-        return new SendMessageResponse(eventId, queued, endpoints);
+        // Sent only when some were held.
+        int held = data != null && data.hasNonNull("messagesHeld") ? data.get("messagesHeld").asInt() : 0;
+        return new SendMessageResponse(eventId, queued, endpoints, held);
     }
 
     public SendMessageResponse send(String applicationId, SendMessageParams params) {

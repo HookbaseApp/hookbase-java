@@ -71,7 +71,14 @@ class ConvenienceOverloadsTest {
                         h -> h.endpoints().rotateSecret("app_1", "ep_1", RequestOptions.builder().retries(0).build()),
                         "POST", "/api/webhook-endpoints/ep_1/rotate-secret", Map.of()),
                 req("endpoints.test(app, ep, options)", h -> h.endpoints().test("app_1", "ep_1", RequestOptions.NONE),
-                        "POST", "/api/webhook-endpoints/ep_1/test", Map.of()));
+                        "POST", "/api/webhook-endpoints/ep_1/test", Map.of()),
+                req("destinations.rotateSecret(id, options)", h -> h.destinations().rotateSecret("dst_1", RequestOptions.NONE),
+                        "POST", "/api/destinations/dst_1/rotate-secret", Map.of()),
+                req("destinations.test(id, options)", h -> h.destinations().test("dst_1", RequestOptions.NONE),
+                        "POST", "/api/destinations/dst_1/test", Map.of()),
+                req("deliveries.replay(id, options)", h -> h.deliveries().replay("del_1", RequestOptions.NONE),
+                        "POST", "/api/deliveries/del_1/replay", Map.of()),
+                req("transforms.engines()", h -> h.transforms().engines(), "GET", "/api/transforms/engines", Map.of()));
     }
 
     private static Arguments req(String name, Consumer<Hookbase> call, String method, String path, Map<String, String> query) {

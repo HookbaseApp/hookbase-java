@@ -24,7 +24,10 @@ public final class ListDeliveriesParams extends Params<ListDeliveriesParams> {
         return set("destinationId", destinationId);
     }
 
-    /** e.g. {@code pending}, {@code delivered}, {@code failed}, {@code retrying}. */
+    /**
+     * One status, e.g. {@code delivered} or {@code failed} (see {@link app.hookbase.models.Delivery#status()}).
+     * {@code pending} also matches {@code awaiting_retry} and {@code held}: everything not finished.
+     */
     public ListDeliveriesParams status(String status) {
         return set("status", status);
     }

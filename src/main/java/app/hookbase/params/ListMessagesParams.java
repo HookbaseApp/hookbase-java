@@ -18,7 +18,8 @@ public final class ListMessagesParams extends Params<ListMessagesParams> {
 
     /**
      * {@code pending}, {@code processing}, {@code success}, {@code failed}, {@code awaiting_retry},
-     * {@code exhausted} or {@code dlq}.
+     * {@code awaiting_pull}, {@code fifo_waiting}, {@code held}, {@code exhausted} or {@code dlq}
+     * (see {@link app.hookbase.models.OutboundMessage#status()}).
      */
     public ListMessagesParams status(String status) {
         return set("status", status);

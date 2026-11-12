@@ -14,6 +14,13 @@ import java.util.List;
  * @param notifyEmails comma-separated addresses notified on failure/success/recovery
  * @param failoverDestinationIds destinations tried in order when the primary keeps failing
  * @param failoverAfterAttempts attempts on the primary before failing over
+ * @param holdOnCircuitOpen while the route's circuit is open, its deliveries wait as {@code held}
+ *     instead of spending attempts, and go out once it recovers (on by default; plans with the
+ *     circuit breaker). When off, a delivery is dead-lettered as soon as it meets the open circuit
+ * @param heldCount get only: deliveries held on this route right now, counted up to 10,000;
+ *     {@code null} on list and create
+ * @param heldCountCapped get only: there are more held deliveries than {@code heldCount};
+ *     {@code null} on list and create
  */
 public record Route(
         String id,
@@ -42,4 +49,7 @@ public record Route(
         Integer failoverAfterAttempts,
         String expectedResponse,
         String createdAt,
-        String updatedAt) {}
+        String updatedAt,
+        boolean holdOnCircuitOpen,
+        Integer heldCount,
+        Boolean heldCountCapped) {}

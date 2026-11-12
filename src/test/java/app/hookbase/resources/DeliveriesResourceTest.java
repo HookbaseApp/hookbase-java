@@ -1,12 +1,16 @@
 package app.hookbase.resources;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import app.hookbase.Page;
+import app.hookbase.errors.HookbaseException;
 import app.hookbase.models.Delivery;
 import app.hookbase.models.DeliveryBulkReplayResult;
 import app.hookbase.models.DeliveryReplayResult;
+import app.hookbase.models.ReplayTransformOverride;
 import app.hookbase.params.ListDeliveriesParams;
+import app.hookbase.params.ReplayDeliveryParams;
 import app.hookbase.testing.MockServer;
 import java.util.List;
 import java.util.Map;
@@ -125,5 +129,97 @@ class DeliveriesResourceTest {
         assertThat(server.last().body()).isEqualTo(MockServer.json("{\"eventIds\":[\"evt_1\",\"evt_2\"]}"));
         assertThat(ev.eventsProcessed()).isEqualTo(2);
         assertThat(ev.overrides().has("destinationOverride")).isTrue();
+    }
+
+    static final String REPLAYED = "{\"deliveryId\":\"del_new\",\"message\":\"Replay queued\",\"modified\":true,"
+            + "\"destinationOverridden\":true,\"transformOverridden\":true,\"transformPersisted\":false,"
+            + "\"headersOverridden\":true,\"targetDestinationId\":\"dst_2\"}";
+
+    @Test
+    void replayWithEditsSendsEveryChangeUnderItsWireName() {
+        server.enqueue(200, REPLAYED);
+        DeliveryReplayResult r = deliveries.replay("del_1", new ReplayDeliveryParams()
+                .payloadPatch(Map.of("status", "paid"))
+                .destinationOverride("backup-dest")
+                .transformOverride(new ReplayTransformOverride("{ \"id\": id }", "jsonata"))
+                .headersOverride(Map.of("X-Replay", "1"))
+                .persistTransform(false));
+
+        assertThat(server.last().method()).isEqualTo("POST");
+        assertThat(server.last().path()).isEqualTo("/api/deliveries/del_1/replay");
+        // A null component of the override is left out, not sent as null.
+        assertThat(server.last().body()).isEqualTo(MockServer.json("""
+                {"payloadPatch":{"status":"paid"},"destinationOverride":"backup-dest",
+                 "transformOverride":{"code":"{ \\"id\\": id }","type":"jsonata"},
+                 "headersOverride":{"X-Replay":"1"},"persistTransform":false}"""));
+        assertThat(r.modified()).isTrue();
+        assertThat(r.destinationOverridden()).isTrue();
+        assertThat(r.transformOverridden()).isTrue();
+        assertThat(r.headersOverridden()).isTrue();
+        assertThat(r.targetDestinationId()).isEqualTo("dst_2");
+    }
+
+    @Test
+    void replayWithAModifiedPayloadSendsAnyJsonValue() {
+        server.enqueue(200, REPLAYED);
+        deliveries.replay("del_1", new ReplayDeliveryParams().modifiedPayload(List.of(1, 2)));
+        assertThat(server.last().body()).isEqualTo(MockServer.json("{\"modifiedPayload\":[1,2]}"));
+    }
+
+    @Test
+    void replayWithBothPayloadEditsFailsBeforeAnyRequest() {
+        ReplayDeliveryParams both = new ReplayDeliveryParams().modifiedPayload(Map.of("a", 1)).payloadPatch(Map.of("b", 2));
+        assertThatThrownBy(() -> deliveries.replay("del_1", both))
+                .isInstanceOf(HookbaseException.class)
+                .hasMessageContaining("modifiedPayload")
+                .hasMessageContaining("payloadPatch");
+        // A JSON null sent through extra() counts as set, as it does to the API.
+        ReplayDeliveryParams withNull = new ReplayDeliveryParams().extra("modifiedPayload", null).payloadPatch(Map.of("b", 2));
+        assertThatThrownBy(() -> deliveries.replay("del_1", withNull)).isInstanceOf(HookbaseException.class);
+        assertThat(server.requests()).isEmpty();
+    }
+
+    @Test
+    void aNullReplayEditIsLeftOutNotSentAsJsonNull() {
+        // The API takes any field that is present as an edit: a JSON null modifiedPayload would
+        // replay a null body to the real destination.
+        ReplayDeliveryParams nulls = new ReplayDeliveryParams()
+                .modifiedPayload(null).payloadPatch(null).destinationOverride(null)
+                .transformOverride(null).headersOverride(null);
+        assertThat(nulls.toMap()).isEmpty();
+
+        // null also drops a value set earlier, so a patch can follow a cleared modifiedPayload.
+        ReplayDeliveryParams cleared = new ReplayDeliveryParams()
+                .modifiedPayload(Map.of("a", 1)).modifiedPayload(null)
+                .payloadPatch(Map.of("b", 2))
+                .destinationOverride("dst_2").destinationOverride(null)
+                .transformOverride(new ReplayTransformOverride("x", "jsonata")).transformOverride(null)
+                .headersOverride(Map.of("X-A", "1")).headersOverride(null);
+        assertThat(cleared.toMap()).containsOnlyKeys("payloadPatch");
+
+        server.enqueue(200, REPLAYED).enqueue(200, REPLAYED);
+        deliveries.replay("del_1", nulls);
+        deliveries.replay("del_1", cleared);
+        assertThat(server.requests().get(0).rawBody()).isNullOrEmpty();
+        assertThat(server.requests().get(1).body()).isEqualTo(MockServer.json("{\"payloadPatch\":{\"b\":2}}"));
+    }
+
+    @Test
+    void replayWithNoOrEmptyParamsSendsNoBody() {
+        server.enqueue(200, REPLAYED);
+        server.enqueue(200, REPLAYED);
+        deliveries.replay("del_1", (ReplayDeliveryParams) null);
+        deliveries.replay("del_1", new ReplayDeliveryParams());
+        assertThat(server.requests()).extracting(MockServer.Request::rawBody).allMatch(b -> b == null || b.isEmpty());
+    }
+
+    @Test
+    void aHeldDeliveryCarriesWhenItsHoldEnds() {
+        server.enqueue(200, "{\"delivery\":{\"id\":\"del_1\",\"status\":\"held\",\"nextRetryAt\":null,"
+                + "\"holdExpiresAt\":\"2026-11-12T00:00:00Z\"}}");
+        Delivery d = deliveries.get("del_1");
+        assertThat(d.status()).isEqualTo("held");
+        assertThat(d.nextRetryAt()).isNull();
+        assertThat(d.holdExpiresAt()).isEqualTo("2026-11-12T00:00:00Z");
     }
 }

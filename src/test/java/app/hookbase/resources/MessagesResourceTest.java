@@ -10,6 +10,7 @@ import app.hookbase.models.MessageExport;
 import app.hookbase.models.MessageReplayResult;
 import app.hookbase.models.MessageStatsSummary;
 import app.hookbase.models.OutboundMessage;
+import app.hookbase.models.OutboundMessageBridge;
 import app.hookbase.models.SendMessageResponse;
 import app.hookbase.params.ExportMessagesParams;
 import app.hookbase.params.ListMessagesParams;
@@ -147,5 +148,43 @@ class MessagesResourceTest {
                 RequestOptions.builder().retries(1).idempotencyKey("k1").build());
         assertThat(server.requests()).hasSize(2);
         assertThat(server.requests()).allSatisfy(r -> assertThat(r.header("Idempotency-Key")).isEqualTo("k1"));
+    }
+
+    @Test
+    void aBridgedMessageCarriesItsOrigin() {
+        server.enqueue(200, "{\"data\":{\"id\":\"om_1\",\"status\":\"success\","
+                + "\"bridge\":{\"inboundEventId\":\"evt_in\",\"deliveryId\":\"del_1\",\"hop\":1}}}");
+        assertThat(messages.get("app_1", "om_1").bridge()).isEqualTo(new OutboundMessageBridge("evt_in", "del_1", 1));
+
+        server.enqueue(200, "{\"data\":{\"id\":\"om_2\",\"status\":\"success\",\"bridge\":null}}");
+        assertThat(messages.get("app_1", "om_2").bridge()).isNull();
+    }
+
+    @Test
+    void sendReadsMessagesHeldAndDefaultsItToZero() {
+        server.enqueue(201, SEND_OK.replace("\"messagesQueued\":2", "\"messagesQueued\":2,\"messagesHeld\":1"));
+        assertThat(messages.send("app_1", new SendMessageParams().eventType("x").payload(Map.of())).messagesHeld()).isEqualTo(1);
+
+        // The API leaves the field out when nothing was held.
+        server.enqueue(201, SEND_OK);
+        SendMessageResponse none = messages.send("app_1", new SendMessageParams().eventType("x").payload(Map.of()));
+        assertThat(none.messagesHeld()).isZero();
+        assertThat(none).isEqualTo(new SendMessageResponse("evt_1", 2, none.endpoints()));
+    }
+
+    @Test
+    void getStatsSummaryReadsTheHeldCount() {
+        server.enqueue(200, "{\"data\":{\"pending\":1,\"processing\":2,\"success\":3,\"failed\":4,\"awaitingRetry\":5,"
+                + "\"held\":9,\"exhausted\":6,\"dlq\":7,\"total\":37}}");
+        assertThat(messages.getStatsSummary()).isEqualTo(new MessageStatsSummary(1, 2, 3, 4, 5, 9, 6, 7, 37));
+    }
+
+    @Test
+    void aHeldMessageCarriesWhenItsHoldEnds() {
+        server.enqueue(200, "{\"data\":{\"id\":\"om_1\",\"status\":\"held\",\"holdExpiresAt\":\"2026-11-12T00:00:00Z\"}}");
+        assertThat(messages.get("app_1", "om_1").holdExpiresAt()).isEqualTo("2026-11-12T00:00:00Z");
+
+        server.enqueue(200, "{\"data\":{\"id\":\"om_2\",\"status\":\"success\",\"holdExpiresAt\":null}}");
+        assertThat(messages.get("app_1", "om_2").holdExpiresAt()).isNull();
     }
 }

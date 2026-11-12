@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import app.hookbase.models.DestinationFieldMapping;
 import app.hookbase.models.DestinationThrottle;
+import app.hookbase.models.ReplayTransformOverride;
 import app.hookbase.models.EndpointHeader;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -33,15 +34,16 @@ class ParamsWireNamesTest {
     static Stream<Arguments> params() {
         return Stream.of(
                 // inbound
-                of(CreateSourceParams.class, "allowedMethods dedupCustomHeader dedupEnabled dedupStrategy dedupWindowHours description encryptFields ipAllowlist ipDenylist ipFilterMode maskFields name provider rateLimitPerMinute rejectInvalidSignatures signingSecret slug transientMode verifyToken"),
+                of(CreateSourceParams.class, "allowedMethods catalogProvider dedupCustomHeader dedupEnabled dedupStrategy dedupWindowHours description encryptFields ipAllowlist ipDenylist ipFilterMode maskFields name provider rateLimitPerMinute rejectInvalidSignatures signingSecret slug transientMode verifyToken"),
                 of(UpdateSourceParams.class, "allowedMethods dedupCustomHeader dedupEnabled dedupStrategy dedupWindowHours description encryptFields ipAllowlist ipDenylist ipFilterMode isActive maskFields name provider rateLimitPerMinute rejectInvalidSignatures signingSecret transientMode verifyToken"),
                 // search/provider/isActive are deprecated: sent, but the API's list reads only page and pageSize.
                 of(ListSourcesParams.class, "isActive page pageSize provider search"),
                 of(CreateDestinationParams.class, "authConfig authType batchSize batchWindowSeconds config fieldMapping headers method name slug throttle timeoutMs type url useStaticIp"),
                 of(UpdateDestinationParams.class, "authConfig authType batchSize batchWindowSeconds config fieldMapping headers isActive method name throttle timeoutMs url useStaticIp"),
+                of(RotateDestinationSecretParams.class, "gracePeriodSeconds"),
                 of(ListDestinationsParams.class, "isActive page pageSize search"),
-                of(CreateRouteParams.class, "destinationId expectedResponse failoverAfterAttempts failoverDestinationIds failureThreshold filterConditions filterId filterLogic isActive name notifyEmails notifyOnFailure notifyOnRecovery notifyOnSuccess priority schemaId sourceId transformId"),
-                of(UpdateRouteParams.class, "destinationId expectedResponse failoverAfterAttempts failoverDestinationIds failureThreshold filterConditions filterId filterLogic isActive name notifyEmails notifyOnFailure notifyOnRecovery notifyOnSuccess priority schemaId sourceId transformId"),
+                of(CreateRouteParams.class, "destinationId expectedResponse failoverAfterAttempts failoverDestinationIds failureThreshold filterConditions filterId filterLogic holdOnCircuitOpen isActive name notifyEmails notifyOnFailure notifyOnRecovery notifyOnSuccess priority schemaId sourceId transformId"),
+                of(UpdateRouteParams.class, "destinationId expectedResponse failoverAfterAttempts failoverDestinationIds failureThreshold filterConditions filterId filterLogic holdOnCircuitOpen isActive name notifyEmails notifyOnFailure notifyOnRecovery notifyOnSuccess priority schemaId sourceId transformId"),
                 of(ListRoutesParams.class, "destinationId isActive page pageSize sourceId"),
                 of(CircuitBreakerConfigParams.class, "circuitCooldownSeconds circuitFailureThreshold circuitProbeSuccessThreshold"),
                 of(ImportParams.class, "conflictStrategy validateOnly"),
@@ -59,13 +61,14 @@ class ParamsWireNamesTest {
                 of(ListEventsParams.class, "cursor eventType fromDate includeTotal limit search signatureValid sourceId status toDate"),
                 of(ExportEventsParams.class, "eventType format fromDate search signatureValid sourceId status toDate"),
                 of(ListDeliveriesParams.class, "destinationId eventId limit offset routeId status"),
+                of(ReplayDeliveryParams.class, "destinationOverride headersOverride modifiedPayload payloadPatch persistTransform transformOverride"),
                 of(ListProvidersParams.class, "category search"),
                 // outbound
                 of(CreateApplicationParams.class, "externalId metadata name"),
                 of(UpdateApplicationParams.class, "metadata name"),
                 of(ListApplicationsParams.class, "cursor isDisabled limit order search"),
-                of(CreateEndpointParams.class, "backoffType circuitCooldownSeconds circuitFailureThreshold circuitSuccessThreshold description headers ipAllowlistNotes rateLimitPerSecond retryDelays signatureScheme successStatusCodes timeoutSeconds url useStaticIp"),
-                of(UpdateEndpointParams.class, "backoffType circuitCooldownSeconds circuitFailureThreshold circuitSuccessThreshold description disabledReason headers ipAllowlistNotes isDisabled rateLimitPerSecond retryDelays signatureScheme successStatusCodes timeoutSeconds url useStaticIp"),
+                of(CreateEndpointParams.class, "backoffType circuitCooldownSeconds circuitFailureThreshold circuitSuccessThreshold description headers holdOnCircuitOpen ipAllowlistNotes rateLimitPerSecond retryDelays signatureScheme successStatusCodes timeoutSeconds url useStaticIp"),
+                of(UpdateEndpointParams.class, "backoffType circuitCooldownSeconds circuitFailureThreshold circuitSuccessThreshold description disabledReason headers holdOnCircuitOpen ipAllowlistNotes isDisabled rateLimitPerSecond retryDelays signatureScheme successStatusCodes timeoutSeconds url useStaticIp"),
                 of(ListEndpointsParams.class, "circuitState cursor isDisabled limit"),
                 of(RotateEndpointSecretParams.class, "gracePeriodSeconds"),
                 of(TestEndpointParams.class, "eventType payload"),
@@ -136,6 +139,7 @@ class ParamsWireNamesTest {
         if (raw == boolean.class || raw == Boolean.class) return true;
         if (raw == double.class || raw == Double.class) return 1.0;
         if (raw == DestinationThrottle.class) return DestinationThrottle.off();
+        if (raw == ReplayTransformOverride.class) return new ReplayTransformOverride("$", "jsonata");
         if (raw == Map.class) return Map.of("k", "v");
         if (List.class.isAssignableFrom(raw) || raw == Iterable.class || raw == java.util.Collection.class) {
             Type element = type instanceof ParameterizedType p ? p.getActualTypeArguments()[0] : Object.class;

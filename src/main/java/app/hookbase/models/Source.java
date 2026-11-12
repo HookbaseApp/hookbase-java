@@ -33,6 +33,9 @@ import java.util.List;
  * @param allowedMethods HTTP verbs the ingest endpoint accepts ({@code GET}, {@code POST},
  *     {@code PUT}, {@code PATCH}, {@code DELETE}, {@code HEAD}); empty means any method
  * @param ingestUrl returned by {@code get()} and {@code create()}, not by {@code list()}
+ * @param catalogProvider the provider-catalog entry ({@code GET /api/catalog/providers/:id}) the
+ *     source was created from, e.g. a dashboard template; {@code null} when it was not created from
+ *     one. Set only on create
  */
 public record Source(
         String id,
@@ -64,7 +67,8 @@ public record Source(
         long routeCount,
         String ingestUrl,
         String createdAt,
-        String updatedAt) {
+        String updatedAt,
+        String catalogProvider) {
 
     public Source {
         ipAllowlist = ipAllowlist == null ? List.of() : List.copyOf(ipAllowlist);

@@ -235,4 +235,25 @@ class EndpointsResourceTest {
         assertThat(server.last().method()).isEqualTo("POST");
         assertThat(server.last().rawBody()).isNull();
     }
+
+    @Test
+    void holdOnCircuitOpenIsSentAndReadBackWithTheHeldCount() {
+        server.enqueue(201, "{\"data\":" + ENDPOINT.replace("\"apiKeyId\":null", "\"apiKeyId\":null,\"holdOnCircuitOpen\":false") + "}");
+        Endpoint created = endpoints.create("app_1", new CreateEndpointParams().url("https://example.com/hook").holdOnCircuitOpen(false));
+        assertThat(server.last().body()).isEqualTo(MockServer.json(
+                "{\"url\":\"https://example.com/hook\",\"holdOnCircuitOpen\":false,\"applicationId\":\"app_1\"}"));
+        assertThat(created.holdOnCircuitOpen()).isFalse();
+        assertThat(created.heldCount()).isNull();
+
+        server.enqueue(200, "{\"data\":" + ENDPOINT.replace("\"apiKeyId\":null", "\"apiKeyId\":null,\"holdOnCircuitOpen\":true") + "}");
+        endpoints.update("app_1", "ep_1", new UpdateEndpointParams().holdOnCircuitOpen(true));
+        assertThat(server.last().rawBody()).isEqualTo("{\"holdOnCircuitOpen\":true}");
+
+        server.enqueue(200, "{\"data\":" + ENDPOINT.replace("\"apiKeyId\":null",
+                "\"apiKeyId\":null,\"holdOnCircuitOpen\":true,\"heldCount\":42,\"heldCountCapped\":false") + "}");
+        Endpoint got = endpoints.get("app_1", "ep_1");
+        assertThat(got.holdOnCircuitOpen()).isTrue();
+        assertThat(got.heldCount()).isEqualTo(42);
+        assertThat(got.heldCountCapped()).isFalse();
+    }
 }
