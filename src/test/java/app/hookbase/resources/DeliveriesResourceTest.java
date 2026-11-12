@@ -187,4 +187,14 @@ class DeliveriesResourceTest {
         deliveries.replay("del_1", new ReplayDeliveryParams());
         assertThat(server.requests()).extracting(MockServer.Request::rawBody).allMatch(b -> b == null || b.isEmpty());
     }
+
+    @Test
+    void aHeldDeliveryCarriesWhenItsHoldEnds() {
+        server.enqueue(200, "{\"delivery\":{\"id\":\"del_1\",\"status\":\"held\",\"nextRetryAt\":null,"
+                + "\"holdExpiresAt\":\"2026-11-12T00:00:00Z\"}}");
+        Delivery d = deliveries.get("del_1");
+        assertThat(d.status()).isEqualTo("held");
+        assertThat(d.nextRetryAt()).isNull();
+        assertThat(d.holdExpiresAt()).isEqualTo("2026-11-12T00:00:00Z");
+    }
 }

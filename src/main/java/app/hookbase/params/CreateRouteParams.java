@@ -85,4 +85,14 @@ public final class CreateRouteParams extends Params<CreateRouteParams> {
     public CreateRouteParams expectedResponse(String expectedResponse) {
         return set("expectedResponse", expectedResponse);
     }
+
+    /**
+     * Whether deliveries wait as {@code held} while the route's circuit is open, instead of
+     * spending attempts against a destination known to be down; they go out once it recovers, or
+     * fail when the plan's retry window ends. On by default; takes effect on plans with the circuit
+     * breaker.
+     */
+    public CreateRouteParams holdOnCircuitOpen(boolean holdOnCircuitOpen) {
+        return set("holdOnCircuitOpen", holdOnCircuitOpen);
+    }
 }

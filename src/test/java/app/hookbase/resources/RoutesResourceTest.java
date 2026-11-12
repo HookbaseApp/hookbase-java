@@ -152,4 +152,32 @@ class RoutesResourceTest {
         assertThat(server.last().path()).isEqualTo("/api/routes/rt_1/circuit-config");
         assertThat(server.last().rawBody()).isEqualTo("{\"circuitCooldownSeconds\":120,\"circuitFailureThreshold\":10}");
     }
+
+    @Test
+    void holdOnCircuitOpenIsSentAndReadBackWithTheHeldCount() {
+        server.enqueue(201, "{\"route\":{\"id\":\"rt_new\",\"holdOnCircuitOpen\":false}}");
+        Route created = routes.create(new CreateRouteParams().name("R").sourceId("src_1").destinationId("dst_1")
+                .holdOnCircuitOpen(false));
+        assertThat(server.last().body().get("holdOnCircuitOpen").asBoolean(true)).isFalse();
+        assertThat(created.holdOnCircuitOpen()).isFalse();
+
+        server.enqueue(200, "{\"success\":true}");
+        routes.update("rt_1", new UpdateRouteParams().holdOnCircuitOpen(true));
+        assertThat(server.last().rawBody()).isEqualTo("{\"holdOnCircuitOpen\":true}");
+
+        // get adds the held count; list does not.
+        server.enqueue(200, "{\"route\":" + ROUTE.replace("\"isActive\":true", "\"isActive\":true,\"holdOnCircuitOpen\":true,"
+                + "\"heldCount\":10000,\"heldCountCapped\":true") + "}");
+        Route got = routes.get("rt_1");
+        assertThat(got.holdOnCircuitOpen()).isTrue();
+        assertThat(got.heldCount()).isEqualTo(10000);
+        assertThat(got.heldCountCapped()).isTrue();
+
+        server.enqueue(200, "{\"routes\":[" + ROUTE.replace("\"isActive\":true", "\"isActive\":true,\"holdOnCircuitOpen\":true")
+                + "],\"pagination\":{\"total\":1,\"page\":1,\"pageSize\":20}}");
+        Route listed = routes.list().data().getFirst();
+        assertThat(listed.holdOnCircuitOpen()).isTrue();
+        assertThat(listed.heldCount()).isNull();
+        assertThat(listed.heldCountCapped()).isNull();
+    }
 }

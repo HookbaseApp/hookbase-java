@@ -106,4 +106,13 @@ public final class UpdateEndpointParams extends Params<UpdateEndpointParams> {
     public UpdateEndpointParams signatureScheme(String signatureScheme) {
         return set("signatureScheme", signatureScheme);
     }
+
+    /**
+     * Whether messages wait as {@code held} while the endpoint's circuit is open, instead of
+     * spending attempts against an endpoint known to be down; they go out once it recovers, or are
+     * dead-lettered when the retry window ends. On by default.
+     */
+    public UpdateEndpointParams holdOnCircuitOpen(boolean holdOnCircuitOpen) {
+        return set("holdOnCircuitOpen", holdOnCircuitOpen);
+    }
 }

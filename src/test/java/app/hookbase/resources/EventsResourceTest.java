@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import app.hookbase.Page;
 import app.hookbase.models.Event;
+import app.hookbase.models.EventDebugDelivery;
 import app.hookbase.models.EventDebugInfo;
 import app.hookbase.models.EventDetail;
 import app.hookbase.params.ExportEventsParams;
@@ -143,5 +144,58 @@ class EventsResourceTest {
 
         server.enqueue(200, "id\n", Map.of("Content-Type", "text/csv"));
         assertThat(events.export(new ExportEventsParams().format("csv")).asText()).isEqualTo("id\n");
+    }
+
+    @Test
+    void debugDeliveriesAreAlsoTyped() {
+        server.enqueue(200, """
+                {"event":{"id":"evt_1"},"payload":{"a":1},"transient":false,
+                 "deliveries":[{"id":"del_1","status":"held","statusCode":503,"durationMs":120,"attempt":2,"maxAttempts":5,
+                   "nextRetryAt":null,"holdExpiresAt":"2026-11-12T00:00:00Z","error":"HTTP 503","responseBody":"down",
+                   "responseHeaders":{"retry-after":"30","set-cookie":"session=abc"},"transformedPayload":{"b":2},
+                   "routeId":"rt_1","destinationId":"dst_1",
+                   "destination":{"name":"Slack","url":"https://hooks.slack.com/x","method":"POST"},
+                   "startedAt":"2026-11-11T00:00:00Z","completedAt":"2026-11-11T00:01:00Z","failoverIndex":0,
+                   "parentDeliveryId":null,"fingerprint":"fp_1","retryAfter":"30","clusterCount":4,
+                   "patternHints":[{"id":"upstream-503","category":"availability","title":"Destination unavailable",
+                     "hypothesis":"h","suggestedFix":"f"}],
+                   "routeCircuit":{"state":"open","openedAt":"2026-11-11T00:00:30Z","cooldownSeconds":300,
+                     "failureThreshold":5,"consecutiveFailures":5}},
+                  {"id":"del_2","status":"delivered","patternHints":[],"routeCircuit":null}]}""");
+        EventDebugInfo info = events.debug("evt_1");
+
+        // The untyped view is still there.
+        assertThat(info.deliveries().get(0).get("clusterCount").asInt()).isEqualTo(4);
+
+        List<EventDebugDelivery> list = info.deliveryList();
+        assertThat(list).hasSize(2);
+        EventDebugDelivery held = list.getFirst();
+        assertThat(held.status()).isEqualTo("held");
+        assertThat(held.nextRetryAt()).isNull();
+        assertThat(held.holdExpiresAt()).isEqualTo("2026-11-12T00:00:00Z");
+        assertThat(held.statusCode()).isEqualTo(503);
+        assertThat(held.durationMs()).isEqualTo(120L);
+        assertThat(held.attempt()).isEqualTo(2);
+        assertThat(held.responseHeaders()).containsEntry("retry-after", "30");
+        assertThat(held.transformedPayload().get("b").asInt()).isEqualTo(2);
+        assertThat(held.destination().url()).isEqualTo("https://hooks.slack.com/x");
+        assertThat(held.retryAfter()).isEqualTo("30");
+        assertThat(held.clusterCount()).isEqualTo(4);
+        assertThat(held.patternHints().getFirst().title()).isEqualTo("Destination unavailable");
+        assertThat(held.routeCircuit().state()).isEqualTo("open");
+        assertThat(held.routeCircuit().consecutiveFailures()).isEqualTo(5);
+        assertThat(held.toString()).doesNotContain("session=abc");
+
+        EventDebugDelivery delivered = list.get(1);
+        assertThat(delivered.patternHints()).isEmpty();
+        assertThat(delivered.routeCircuit()).isNull();
+        assertThat(delivered.responseHeaders()).isEmpty();
+        assertThat(delivered.clusterCount()).isNull();
+    }
+
+    @Test
+    void debugWithoutDeliveriesHasAnEmptyTypedList() {
+        server.enqueue(200, "{\"event\":{\"id\":\"evt_1\"},\"transient\":true}");
+        assertThat(events.debug("evt_1").deliveryList()).isEmpty();
     }
 }

@@ -12,8 +12,10 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
  * @param eventId the outbound event this message delivers (what {@code send} returned as {@code eventId})
  * @param endpointUrl {@code null} when the endpoint has since been deleted
  * @param status {@code pending}, {@code processing}, {@code success}, {@code failed},
- *     {@code awaiting_retry}, {@code exhausted} or {@code dlq}; open-ended, so a status the API adds
- *     later still parses
+ *     {@code awaiting_retry}, {@code awaiting_pull} (a polling endpoint's, until it is pulled),
+ *     {@code fifo_waiting} (queued behind an earlier message to a FIFO endpoint), {@code held}
+ *     (waiting while the endpoint's circuit is open), {@code exhausted} or {@code dlq}; open-ended,
+ *     so a status the API adds later still parses
  * @param subscriptionId get only
  * @param eventTypeId get only
  * @param lastErrorType get only
@@ -24,6 +26,8 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
  * @param priority get only; 0=Critical .. 4=Bulk
  * @param endpointDescription get only
  * @param payload get only: the stored payload, or {@code null} once retention has removed it
+ * @param holdExpiresAt for a {@code held} message, when the hold ends: a message whose endpoint
+ *     has not recovered by then is dead-lettered. {@code null} for every other status
  * @param bridge get only: the inbound event and delivery a {@code bridge} destination published
  *     this message's event from; {@code null} for an event sent any other way
  */
@@ -52,4 +56,5 @@ public record OutboundMessage(
         Integer priority,
         String endpointDescription,
         JsonNode payload,
+        String holdExpiresAt,
         OutboundMessageBridge bridge) {}

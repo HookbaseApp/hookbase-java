@@ -46,6 +46,8 @@ class RedactionTest {
 
         assertThat(read("{\"headers\":{\"webhook-signature\":\"v1,sig\",\"content-type\":\"application/json\"}}", EventDebugRequest.class).toString())
                 .doesNotContain("v1,sig").contains("content-type=application/json");
+        assertThat(read("{\"id\":\"del_1\",\"responseHeaders\":{\"set-cookie\":\"sid=s3cr3t\",\"content-type\":\"text/plain\"}}",
+                EventDebugDelivery.class).toString()).doesNotContain("s3cr3t").contains("content-type=text/plain");
         assertThat(new EndpointHeader("X-Api-Key", "k123").toString()).doesNotContain("k123");
         assertThat(new EndpointHeader("X-Tenant", "acme").toString()).contains("acme");
     }
