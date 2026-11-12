@@ -32,8 +32,8 @@ import java.util.Map;
  * @param secret the plaintext signing secret: set on the {@code create} response only, and shown
  *     only that once
  * @param holdOnCircuitOpen while the endpoint's circuit is open, its messages wait as {@code held}
- *     instead of spending attempts, and go out once it recovers (on by default). When off, they
- *     keep retrying and fail as before
+ *     instead of spending attempts, and go out once it recovers (on by default). When off, a
+ *     message is dead-lettered as soon as it meets the open circuit
  * @param heldCount get only: messages held for this endpoint right now, counted up to 10,000;
  *     {@code null} on list, create and update
  * @param heldCountCapped get only: there are more held messages than {@code heldCount};

@@ -16,7 +16,7 @@ import java.util.List;
  * @param failoverAfterAttempts attempts on the primary before failing over
  * @param holdOnCircuitOpen while the route's circuit is open, its deliveries wait as {@code held}
  *     instead of spending attempts, and go out once it recovers (on by default; plans with the
- *     circuit breaker). When off, they keep retrying and fail as before
+ *     circuit breaker). When off, a delivery is dead-lettered as soon as it meets the open circuit
  * @param heldCount get only: deliveries held on this route right now, counted up to 10,000;
  *     {@code null} on list and create
  * @param heldCountCapped get only: there are more held deliveries than {@code heldCount};

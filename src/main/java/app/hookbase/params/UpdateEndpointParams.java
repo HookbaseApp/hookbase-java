@@ -110,7 +110,8 @@ public final class UpdateEndpointParams extends Params<UpdateEndpointParams> {
     /**
      * Whether messages wait as {@code held} while the endpoint's circuit is open, instead of
      * spending attempts against an endpoint known to be down; they go out once it recovers, or are
-     * dead-lettered when the retry window ends. On by default.
+     * dead-lettered when the retry window ends. On by default. When off, a message is dead-lettered
+     * as soon as it meets the open circuit, without further attempts.
      */
     public UpdateEndpointParams holdOnCircuitOpen(boolean holdOnCircuitOpen) {
         return set("holdOnCircuitOpen", holdOnCircuitOpen);

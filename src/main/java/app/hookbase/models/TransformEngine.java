@@ -7,7 +7,8 @@ package app.hookbase.models;
  *     {@code javascript}, {@code jq}
  * @param label a display name, e.g. {@code JSONata}
  * @param description one line on what the language is for
- * @param fileExtension the extension a file of this language's code takes, e.g. {@code .jsonata}
+ * @param fileExtension the extension for a file of this language's code, without the dot:
+ *     {@code jsonata}, {@code js}, ...
  * @param starterCode a small working transform to start from
  * @param aiGenerate whether the dashboard can generate code in this language
  * @param available whether this deployment runs the language; false when it needs transform

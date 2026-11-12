@@ -173,10 +173,35 @@ class DeliveriesResourceTest {
                 .isInstanceOf(HookbaseException.class)
                 .hasMessageContaining("modifiedPayload")
                 .hasMessageContaining("payloadPatch");
-        // An explicit null counts as set, as it does to the API.
-        ReplayDeliveryParams withNull = new ReplayDeliveryParams().modifiedPayload(null).payloadPatch(Map.of("b", 2));
+        // A JSON null sent through extra() counts as set, as it does to the API.
+        ReplayDeliveryParams withNull = new ReplayDeliveryParams().extra("modifiedPayload", null).payloadPatch(Map.of("b", 2));
         assertThatThrownBy(() -> deliveries.replay("del_1", withNull)).isInstanceOf(HookbaseException.class);
         assertThat(server.requests()).isEmpty();
+    }
+
+    @Test
+    void aNullReplayEditIsLeftOutNotSentAsJsonNull() {
+        // The API takes any field that is present as an edit: a JSON null modifiedPayload would
+        // replay a null body to the real destination.
+        ReplayDeliveryParams nulls = new ReplayDeliveryParams()
+                .modifiedPayload(null).payloadPatch(null).destinationOverride(null)
+                .transformOverride(null).headersOverride(null);
+        assertThat(nulls.toMap()).isEmpty();
+
+        // null also drops a value set earlier, so a patch can follow a cleared modifiedPayload.
+        ReplayDeliveryParams cleared = new ReplayDeliveryParams()
+                .modifiedPayload(Map.of("a", 1)).modifiedPayload(null)
+                .payloadPatch(Map.of("b", 2))
+                .destinationOverride("dst_2").destinationOverride(null)
+                .transformOverride(new ReplayTransformOverride("x", "jsonata")).transformOverride(null)
+                .headersOverride(Map.of("X-A", "1")).headersOverride(null);
+        assertThat(cleared.toMap()).containsOnlyKeys("payloadPatch");
+
+        server.enqueue(200, REPLAYED).enqueue(200, REPLAYED);
+        deliveries.replay("del_1", nulls);
+        deliveries.replay("del_1", cleared);
+        assertThat(server.requests().get(0).rawBody()).isNullOrEmpty();
+        assertThat(server.requests().get(1).body()).isEqualTo(MockServer.json("{\"payloadPatch\":{\"b\":2}}"));
     }
 
     @Test

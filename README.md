@@ -303,7 +303,8 @@ replay with both before sending it. It can also go to another destination
 
 **Holds.** While a route's or an endpoint's circuit breaker is open, its deliveries and messages
 wait with status `held` instead of spending attempts, and go out once it recovers. It is on by
-default; `holdOnCircuitOpen(false)` on the route or endpoint params turns it off. A held item
+default; `holdOnCircuitOpen(false)` on the route or endpoint params turns it off, and then a
+delivery or message that meets the open circuit is dead-lettered at once. A held item
 carries `holdExpiresAt`, `routes().get()` and `endpoints().get()` report `heldCount`,
 `messages().send()` reports `messagesHeld`, and `messages().getStatsSummary()` has `held`.
 
@@ -466,6 +467,26 @@ SDK models them. Timestamps are ISO-8601 strings (`Instant.parse(app.createdAt()
 free-form JSON such as payloads and metadata is a Jackson `JsonNode`. Records that carry
 credentials (`ApiKeyWithSecret`, `SourceWithSecret`, `Endpoint`, `PortalToken` ...) print them as
 `<redacted>` in `toString()`, so logging one is safe.
+
+## Upgrading to 1.2
+
+Code that calls the SDK compiles unchanged, with three exceptions, all in code that builds or
+takes apart response records itself (test stubs, mostly) or passes a literal `null`:
+
+- **New record components.** These records gained components at the end: `Destination`
+  (`hasSigningSecret`, `signingSecret`), `Route` and `Endpoint` (`holdOnCircuitOpen`, `heldCount`,
+  `heldCountCapped`), `Delivery` (`holdExpiresAt`), `OutboundMessage` (`holdExpiresAt`, `bridge`),
+  `Source` and `SourceWithSecret` (`catalogProvider`). A call to their constructor needs the new
+  arguments.
+- **Record patterns.** A record deconstruction pattern lists every component, so a pattern over any
+  of those records (`case Route(var id, ...)`, `instanceof Delivery(...)`) no longer compiles, nor
+  does one over `DestinationTestResult` (`dryRun`, `eventType`, `eventTypeExists`,
+  `matchingEndpoints` at the end), `SendMessageResponse` (`messagesHeld` at the end) or
+  `MessageStatsSummary` (`held`, between `awaitingRetry` and `exhausted`). Those last three keep
+  their old constructors, so only patterns over them break. Add the new components to the
+  pattern, or read the record through its accessors.
+- **`deliveries().replay(id, null)`.** With the new `replay(id, ReplayDeliveryParams)` overload a
+  literal `null` is ambiguous. Call `replay(id)`, or cast: `replay(id, (RequestOptions) null)`.
 
 ## Examples
 

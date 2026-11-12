@@ -90,7 +90,8 @@ public final class CreateRouteParams extends Params<CreateRouteParams> {
      * Whether deliveries wait as {@code held} while the route's circuit is open, instead of
      * spending attempts against a destination known to be down; they go out once it recovers, or
      * fail when the plan's retry window ends. On by default; takes effect on plans with the circuit
-     * breaker.
+     * breaker. When off, a delivery is dead-lettered as soon as it meets the open circuit, without
+     * further attempts.
      */
     public CreateRouteParams holdOnCircuitOpen(boolean holdOnCircuitOpen) {
         return set("holdOnCircuitOpen", holdOnCircuitOpen);
