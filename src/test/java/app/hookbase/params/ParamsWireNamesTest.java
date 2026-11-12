@@ -40,6 +40,7 @@ class ParamsWireNamesTest {
                 of(ListSourcesParams.class, "isActive page pageSize provider search"),
                 of(CreateDestinationParams.class, "authConfig authType batchSize batchWindowSeconds config fieldMapping headers method name slug throttle timeoutMs type url useStaticIp"),
                 of(UpdateDestinationParams.class, "authConfig authType batchSize batchWindowSeconds config fieldMapping headers isActive method name throttle timeoutMs url useStaticIp"),
+                of(RotateDestinationSecretParams.class, "gracePeriodSeconds"),
                 of(ListDestinationsParams.class, "isActive page pageSize search"),
                 of(CreateRouteParams.class, "destinationId expectedResponse failoverAfterAttempts failoverDestinationIds failureThreshold filterConditions filterId filterLogic isActive name notifyEmails notifyOnFailure notifyOnRecovery notifyOnSuccess priority schemaId sourceId transformId"),
                 of(UpdateRouteParams.class, "destinationId expectedResponse failoverAfterAttempts failoverDestinationIds failureThreshold filterConditions filterId filterLogic isActive name notifyEmails notifyOnFailure notifyOnRecovery notifyOnSuccess priority schemaId sourceId transformId"),

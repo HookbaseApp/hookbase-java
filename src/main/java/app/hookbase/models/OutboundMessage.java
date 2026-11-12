@@ -24,6 +24,8 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
  * @param priority get only; 0=Critical .. 4=Bulk
  * @param endpointDescription get only
  * @param payload get only: the stored payload, or {@code null} once retention has removed it
+ * @param bridge get only: the inbound event and delivery a {@code bridge} destination published
+ *     this message's event from; {@code null} for an event sent any other way
  */
 public record OutboundMessage(
         String id,
@@ -49,4 +51,5 @@ public record OutboundMessage(
         @JsonDeserialize(using = JsonTextDeserializer.class) JsonNode metadata,
         Integer priority,
         String endpointDescription,
-        JsonNode payload) {}
+        JsonNode payload,
+        OutboundMessageBridge bridge) {}

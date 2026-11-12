@@ -5,14 +5,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import app.hookbase.Page;
 import app.hookbase.errors.HookbaseException;
+import app.hookbase.models.BridgeConfig;
 import app.hookbase.models.Destination;
 import app.hookbase.models.DestinationFieldMapping;
+import app.hookbase.models.DestinationSecret;
 import app.hookbase.models.DestinationTestResult;
 import app.hookbase.models.DestinationThrottle;
 import app.hookbase.models.ImportResult;
 import app.hookbase.params.CreateDestinationParams;
 import app.hookbase.params.ImportParams;
 import app.hookbase.params.ListDestinationsParams;
+import app.hookbase.params.RotateDestinationSecretParams;
 import app.hookbase.params.UpdateDestinationParams;
 import app.hookbase.testing.MockServer;
 import java.util.LinkedHashMap;
@@ -190,5 +193,107 @@ class DestinationsResourceTest {
         assertThat(failed.success()).isFalse();
         assertThat(failed.error()).isEqualTo("Network error");
         assertThat(failed.status()).isNull();
+    }
+
+    @Test
+    void createReturnsTheSigningSecretOnceAndReadsCarryOnlyTheFlag() {
+        server.enqueue(201, "{\"destination\":{\"id\":\"dst_9\",\"type\":\"http\",\"hasSigningSecret\":true,"
+                + "\"signingSecret\":\"whsec_abc\"}}");
+        Destination created = destinations.create(new CreateDestinationParams().name("Signed").url("https://example.com"));
+        assertThat(created.hasSigningSecret()).isTrue();
+        assertThat(created.signingSecret()).isEqualTo("whsec_abc");
+        assertThat(created.toString()).doesNotContain("whsec_abc");
+
+        server.enqueue(200, "{\"destination\":" + DEST.replace("\"isActive\":true", "\"isActive\":true,\"hasSigningSecret\":true") + "}");
+        Destination read = destinations.get("dst_1");
+        assertThat(read.hasSigningSecret()).isTrue();
+        assertThat(read.signingSecret()).isNull();
+    }
+
+    @Test
+    void revealSecretGetsTheSecret() {
+        server.enqueue(200, "{\"signingSecret\":\"whsec_abc\",\"previousSecretExpiresAt\":null}");
+        DestinationSecret secret = destinations.revealSecret("my dest");
+        assertThat(server.last().method()).isEqualTo("GET");
+        assertThat(server.last().path()).isEqualTo("/api/destinations/my%20dest/reveal-secret");
+        assertThat(secret.signingSecret()).isEqualTo("whsec_abc");
+        assertThat(secret.previousSecretExpiresAt()).isNull();
+        assertThat(secret.toString()).doesNotContain("whsec_abc");
+    }
+
+    @Test
+    void rotateSecretSendsTheGracePeriodOnlyWhenSet() {
+        server.enqueue(200, "{\"signingSecret\":\"whsec_new\",\"previousSecretExpiresAt\":\"2026-11-11T01:00:00Z\"}");
+        server.enqueue(200, "{\"signingSecret\":\"whsec_newer\",\"previousSecretExpiresAt\":null}");
+
+        DestinationSecret rotated = destinations.rotateSecret("dst_1");
+        assertThat(server.last().method()).isEqualTo("POST");
+        assertThat(server.last().path()).isEqualTo("/api/destinations/dst_1/rotate-secret");
+        assertThat(server.last().rawBody()).isNullOrEmpty();
+        assertThat(rotated.signingSecret()).isEqualTo("whsec_new");
+        assertThat(rotated.previousSecretExpiresAt()).isEqualTo("2026-11-11T01:00:00Z");
+
+        DestinationSecret now = destinations.rotateSecret("dst_1", new RotateDestinationSecretParams().gracePeriodSeconds(0));
+        assertThat(server.last().body()).isEqualTo(MockServer.json("{\"gracePeriodSeconds\":0}"));
+        assertThat(now.previousSecretExpiresAt()).isNull();
+    }
+
+    @Test
+    void rotateSecretIsNotRetriedAfterA5xx() {
+        server.enqueue(503, "{\"error\":\"unavailable\"}");
+        server.enqueue(200, "{\"signingSecret\":\"whsec_new\",\"previousSecretExpiresAt\":null}");
+        assertThatThrownBy(() -> destinations.rotateSecret("dst_1")).isInstanceOf(HookbaseException.class);
+        assertThat(server.requests()).hasSize(1);
+    }
+
+    @Test
+    void testWithAPayloadSendsItAndBindsABridgeDryRun() {
+        server.enqueue(200, "{\"success\":true,\"dryRun\":true,\"eventType\":\"shop.order.created\","
+                + "\"eventTypeExists\":true,\"matchingEndpoints\":3}");
+        DestinationTestResult dry = destinations.test("dst_b", Map.of("type", "order.created"));
+        assertThat(server.last().method()).isEqualTo("POST");
+        assertThat(server.last().path()).isEqualTo("/api/destinations/dst_b/test");
+        assertThat(server.last().body()).isEqualTo(MockServer.json("{\"payload\":{\"type\":\"order.created\"}}"));
+        assertThat(dry).isEqualTo(new DestinationTestResult(true, null, null, null, null, true, "shop.order.created", true, 3));
+
+        server.enqueue(200, "{\"success\":false,\"dryRun\":true,\"eventType\":null,\"eventTypeExists\":false,"
+                + "\"matchingEndpoints\":0,\"error\":\"No event type at type\"}");
+        DestinationTestResult missing = destinations.test("dst_b", Map.of());
+        assertThat(missing.success()).isFalse();
+        assertThat(missing.eventType()).isNull();
+        assertThat(missing.error()).isEqualTo("No event type at type");
+
+        // Without a payload no body is sent, and a plain test has no dry-run fields.
+        server.enqueue(200, "{\"success\":true,\"status\":200,\"latencyMs\":5,\"responseBody\":\"OK\"}");
+        DestinationTestResult plain = destinations.test("dst_1", (Object) null);
+        assertThat(server.last().rawBody()).isNullOrEmpty();
+        assertThat(plain.dryRun()).isFalse();
+        assertThat(plain.eventTypeExists()).isNull();
+        assertThat(plain.matchingEndpoints()).isNull();
+    }
+
+    @Test
+    void createABridgeWithABridgeConfig() {
+        server.enqueue(201, "{\"destination\":{\"id\":\"dst_b\",\"type\":\"bridge\",\"url\":\"\",\"hasSigningSecret\":false,"
+                + "\"signingSecret\":null,\"config\":{\"eventTypeSource\":\"field\",\"eventTypeField\":\"type\","
+                + "\"eventTypePrefix\":\"shop.\"}}}");
+        Destination bridge = destinations.create(new CreateDestinationParams().name("Orders").type("bridge")
+                .config(BridgeConfig.field("type").withPrefix("shop.").toMap()));
+        assertThat(server.last().body()).isEqualTo(MockServer.json("""
+                {"name":"Orders","type":"bridge","config":{"eventTypeSource":"field","eventTypeField":"type",
+                 "eventTypePrefix":"shop."},"slug":"orders"}"""));
+        assertThat(bridge.type()).isEqualTo("bridge");
+        assertThat(bridge.hasSigningSecret()).isFalse();
+        assertThat(bridge.signingSecret()).isNull();
+        assertThat(bridge.config().get("eventTypePrefix").asText()).isEqualTo("shop.");
+    }
+
+    @Test
+    void bridgeConfigLeavesUnsetFieldsOut() {
+        assertThat(BridgeConfig.fixed("order.created").toMap()).containsExactly(
+                Map.entry("eventTypeSource", "fixed"), Map.entry("eventType", "order.created"));
+        assertThat(BridgeConfig.fixed("order.created").withApplicationId("app_1").withAllowUnverifiedSources(true).toMap())
+                .containsExactly(Map.entry("eventTypeSource", "fixed"), Map.entry("eventType", "order.created"),
+                        Map.entry("applicationId", "app_1"), Map.entry("allowUnverifiedSources", true));
     }
 }

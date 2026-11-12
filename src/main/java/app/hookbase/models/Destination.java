@@ -9,17 +9,24 @@ import java.util.Map;
  * An inbound destination: where routed events are delivered.
  *
  * @param type {@code http}, a queue ({@code sqs}, {@code eventbridge}, {@code servicebus},
- *     {@code pubsub}, {@code oci_queue}) or a warehouse ({@code s3}, {@code r2}, {@code gcs},
- *     {@code azure_blob})
- * @param url empty for queue and warehouse destinations
+ *     {@code pubsub}, {@code oci_queue}), a warehouse ({@code s3}, {@code r2}, {@code gcs},
+ *     {@code azure_blob}) or {@code bridge} (publishes each delivery as an outbound event)
+ * @param url empty for queue, warehouse and bridge destinations
  * @param method {@code GET}, {@code POST}, {@code PUT}, {@code PATCH} or {@code DELETE}
  * @param headers sent as a name-to-value record
  * @param authType {@code none}, {@code basic}, {@code bearer}, {@code api_key} or {@code custom_header}
  * @param timeoutMs request timeout in milliseconds
- * @param config the queue or warehouse configuration (bucket, region, credentials, prefix, ...);
- *     {@code null} for HTTP destinations
+ * @param config the queue or warehouse configuration (bucket, region, credentials, prefix, ...),
+ *     or a bridge's {@link BridgeConfig} as stored; {@code null} for HTTP destinations
  * @param fieldMapping warehouse column mapping, or {@code null}
  * @param routeCount routes pointing at this destination
+ * @param hasSigningSecret whether Hookbase signs deliveries to this destination. Only {@code http}
+ *     destinations are signed: one is created with a secret, and one without (created before
+ *     signing existed) gets one from {@code destinations().rotateSecret()}. The secret itself is
+ *     behind {@code destinations().revealSecret()}
+ * @param signingSecret the plaintext signing secret ({@code whsec_...}): set on the {@code create}
+ *     response of an {@code http} destination only, and shown only that once; {@code null} on
+ *     every other response
  */
 public record Destination(
         String id,
@@ -45,10 +52,13 @@ public record Destination(
         Long successCount,
         Long failureCount,
         String createdAt,
-        String updatedAt) {
+        String updatedAt,
+        boolean hasSigningSecret,
+        String signingSecret) {
     /** Credentials are printed as {@code <redacted>}, so logging this record is safe. */
     @Override
     public String toString() {
-        return Redact.toString(this, Map.of("headers", Redact.Rule.HEADERS, "authConfig", Redact.Rule.KEYS, "config", Redact.Rule.KEYS));
+        return Redact.toString(this, Map.of("headers", Redact.Rule.HEADERS, "authConfig", Redact.Rule.KEYS,
+                "config", Redact.Rule.KEYS, "signingSecret", Redact.Rule.SECRET));
     }
 }

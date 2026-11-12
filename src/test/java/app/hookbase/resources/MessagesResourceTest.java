@@ -10,6 +10,7 @@ import app.hookbase.models.MessageExport;
 import app.hookbase.models.MessageReplayResult;
 import app.hookbase.models.MessageStatsSummary;
 import app.hookbase.models.OutboundMessage;
+import app.hookbase.models.OutboundMessageBridge;
 import app.hookbase.models.SendMessageResponse;
 import app.hookbase.params.ExportMessagesParams;
 import app.hookbase.params.ListMessagesParams;
@@ -147,5 +148,15 @@ class MessagesResourceTest {
                 RequestOptions.builder().retries(1).idempotencyKey("k1").build());
         assertThat(server.requests()).hasSize(2);
         assertThat(server.requests()).allSatisfy(r -> assertThat(r.header("Idempotency-Key")).isEqualTo("k1"));
+    }
+
+    @Test
+    void aBridgedMessageCarriesItsOrigin() {
+        server.enqueue(200, "{\"data\":{\"id\":\"om_1\",\"status\":\"success\","
+                + "\"bridge\":{\"inboundEventId\":\"evt_in\",\"deliveryId\":\"del_1\",\"hop\":1}}}");
+        assertThat(messages.get("app_1", "om_1").bridge()).isEqualTo(new OutboundMessageBridge("evt_in", "del_1", 1));
+
+        server.enqueue(200, "{\"data\":{\"id\":\"om_2\",\"status\":\"success\",\"bridge\":null}}");
+        assertThat(messages.get("app_1", "om_2").bridge()).isNull();
     }
 }
