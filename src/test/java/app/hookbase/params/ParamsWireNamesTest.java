@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import app.hookbase.models.DestinationFieldMapping;
 import app.hookbase.models.DestinationThrottle;
+import app.hookbase.models.ReplayTransformOverride;
 import app.hookbase.models.EndpointHeader;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -59,6 +60,7 @@ class ParamsWireNamesTest {
                 of(ListEventsParams.class, "cursor eventType fromDate includeTotal limit search signatureValid sourceId status toDate"),
                 of(ExportEventsParams.class, "eventType format fromDate search signatureValid sourceId status toDate"),
                 of(ListDeliveriesParams.class, "destinationId eventId limit offset routeId status"),
+                of(ReplayDeliveryParams.class, "destinationOverride headersOverride modifiedPayload payloadPatch persistTransform transformOverride"),
                 of(ListProvidersParams.class, "category search"),
                 // outbound
                 of(CreateApplicationParams.class, "externalId metadata name"),
@@ -136,6 +138,7 @@ class ParamsWireNamesTest {
         if (raw == boolean.class || raw == Boolean.class) return true;
         if (raw == double.class || raw == Double.class) return 1.0;
         if (raw == DestinationThrottle.class) return DestinationThrottle.off();
+        if (raw == ReplayTransformOverride.class) return new ReplayTransformOverride("$", "jsonata");
         if (raw == Map.class) return Map.of("k", "v");
         if (List.class.isAssignableFrom(raw) || raw == Iterable.class || raw == java.util.Collection.class) {
             Type element = type instanceof ParameterizedType p ? p.getActualTypeArguments()[0] : Object.class;

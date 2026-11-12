@@ -6,8 +6,10 @@ import app.hookbase.Pager;
 import app.hookbase.RequestOptions;
 import app.hookbase.models.Delivery;
 import app.hookbase.models.DeliveryBulkReplayResult;
+import app.hookbase.errors.HookbaseException;
 import app.hookbase.models.DeliveryReplayResult;
 import app.hookbase.params.ListDeliveriesParams;
+import app.hookbase.params.ReplayDeliveryParams;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -72,11 +74,35 @@ public final class DeliveriesResource extends BaseResource {
 
     /** Queue a new delivery of the same event to the same destination. */
     public DeliveryReplayResult replay(String deliveryId, RequestOptions options) {
-        return as(post(PATH + "/" + seg(deliveryId) + "/replay", null, options), DeliveryReplayResult.class);
+        return replay(deliveryId, null, options);
     }
 
     public DeliveryReplayResult replay(String deliveryId) {
-        return replay(deliveryId, null);
+        return replay(deliveryId, null, null);
+    }
+
+    /**
+     * Queue a new delivery of the same event, changed as {@code params} says: an edited or patched
+     * payload, another destination, a one-off transform, extra headers. The result's flags say which
+     * changes were applied. Replaying into a {@code bridge} destination with a changed payload or
+     * destination also takes permission to send events.
+     *
+     * <p>Not retried after a timeout or 5xx, as a replay that did go through would be sent twice.
+     *
+     * @param params the changes; {@code null} or empty replays the delivery unchanged
+     * @throws HookbaseException before any request when both {@code modifiedPayload} and
+     *     {@code payloadPatch} are set
+     */
+    public DeliveryReplayResult replay(String deliveryId, ReplayDeliveryParams params, RequestOptions options) {
+        if (params != null && params.has("modifiedPayload") && params.has("payloadPatch")) {
+            throw new HookbaseException("Set either modifiedPayload or payloadPatch on a replay, not both");
+        }
+        Object body = params == null || params.toMap().isEmpty() ? null : body(params);
+        return as(post(PATH + "/" + seg(deliveryId) + "/replay", body, options), DeliveryReplayResult.class);
+    }
+
+    public DeliveryReplayResult replay(String deliveryId, ReplayDeliveryParams params) {
+        return replay(deliveryId, params, null);
     }
 
     /** Replay up to 100 deliveries. */

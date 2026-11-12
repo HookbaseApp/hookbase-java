@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import app.hookbase.Page;
 import app.hookbase.models.Transform;
+import app.hookbase.models.TransformEngine;
+import app.hookbase.models.TransformEngines;
 import app.hookbase.models.TransformTestResult;
 import app.hookbase.params.CreateTransformParams;
 import app.hookbase.params.ListTransformsParams;
@@ -116,5 +118,22 @@ class TransformsResourceTest {
         assertThat(failed.success()).isFalse();
         assertThat(failed.error()).isEqualTo("Unexpected token");
         assertThat(failed.result()).isNull();
+    }
+
+    @Test
+    void enginesListsTheLanguagesAndContentFormats() {
+        server.enqueue(200, """
+                {"engines":[{"type":"jsonata","label":"JSONata","description":"d","fileExtension":".jsonata",
+                  "starterCode":"$","aiGenerate":true,"available":true},
+                 {"type":"javascript","label":"JavaScript","description":"d","fileExtension":".js",
+                  "starterCode":"return payload;","aiGenerate":true,"available":false}],
+                 "contentFormats":["json","xml","text"]}""");
+        TransformEngines engines = transforms.engines();
+        assertThat(server.last().method()).isEqualTo("GET");
+        assertThat(server.last().path()).isEqualTo("/api/transforms/engines");
+        assertThat(engines.engines()).extracting(TransformEngine::type).containsExactly("jsonata", "javascript");
+        assertThat(engines.engines().get(0)).isEqualTo(new TransformEngine("jsonata", "JSONata", "d", ".jsonata", "$", true, true));
+        assertThat(engines.engines().get(1).available()).isFalse();
+        assertThat(engines.contentFormats()).containsExactly("json", "xml", "text");
     }
 }

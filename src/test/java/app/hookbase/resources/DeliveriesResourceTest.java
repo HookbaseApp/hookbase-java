@@ -1,12 +1,16 @@
 package app.hookbase.resources;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import app.hookbase.Page;
+import app.hookbase.errors.HookbaseException;
 import app.hookbase.models.Delivery;
 import app.hookbase.models.DeliveryBulkReplayResult;
 import app.hookbase.models.DeliveryReplayResult;
+import app.hookbase.models.ReplayTransformOverride;
 import app.hookbase.params.ListDeliveriesParams;
+import app.hookbase.params.ReplayDeliveryParams;
 import app.hookbase.testing.MockServer;
 import java.util.List;
 import java.util.Map;
@@ -125,5 +129,62 @@ class DeliveriesResourceTest {
         assertThat(server.last().body()).isEqualTo(MockServer.json("{\"eventIds\":[\"evt_1\",\"evt_2\"]}"));
         assertThat(ev.eventsProcessed()).isEqualTo(2);
         assertThat(ev.overrides().has("destinationOverride")).isTrue();
+    }
+
+    static final String REPLAYED = "{\"deliveryId\":\"del_new\",\"message\":\"Replay queued\",\"modified\":true,"
+            + "\"destinationOverridden\":true,\"transformOverridden\":true,\"transformPersisted\":false,"
+            + "\"headersOverridden\":true,\"targetDestinationId\":\"dst_2\"}";
+
+    @Test
+    void replayWithEditsSendsEveryChangeUnderItsWireName() {
+        server.enqueue(200, REPLAYED);
+        DeliveryReplayResult r = deliveries.replay("del_1", new ReplayDeliveryParams()
+                .payloadPatch(Map.of("status", "paid"))
+                .destinationOverride("backup-dest")
+                .transformOverride(new ReplayTransformOverride("{ \"id\": id }", "jsonata"))
+                .headersOverride(Map.of("X-Replay", "1"))
+                .persistTransform(false));
+
+        assertThat(server.last().method()).isEqualTo("POST");
+        assertThat(server.last().path()).isEqualTo("/api/deliveries/del_1/replay");
+        // A null component of the override is left out, not sent as null.
+        assertThat(server.last().body()).isEqualTo(MockServer.json("""
+                {"payloadPatch":{"status":"paid"},"destinationOverride":"backup-dest",
+                 "transformOverride":{"code":"{ \\"id\\": id }","type":"jsonata"},
+                 "headersOverride":{"X-Replay":"1"},"persistTransform":false}"""));
+        assertThat(r.modified()).isTrue();
+        assertThat(r.destinationOverridden()).isTrue();
+        assertThat(r.transformOverridden()).isTrue();
+        assertThat(r.headersOverridden()).isTrue();
+        assertThat(r.targetDestinationId()).isEqualTo("dst_2");
+    }
+
+    @Test
+    void replayWithAModifiedPayloadSendsAnyJsonValue() {
+        server.enqueue(200, REPLAYED);
+        deliveries.replay("del_1", new ReplayDeliveryParams().modifiedPayload(List.of(1, 2)));
+        assertThat(server.last().body()).isEqualTo(MockServer.json("{\"modifiedPayload\":[1,2]}"));
+    }
+
+    @Test
+    void replayWithBothPayloadEditsFailsBeforeAnyRequest() {
+        ReplayDeliveryParams both = new ReplayDeliveryParams().modifiedPayload(Map.of("a", 1)).payloadPatch(Map.of("b", 2));
+        assertThatThrownBy(() -> deliveries.replay("del_1", both))
+                .isInstanceOf(HookbaseException.class)
+                .hasMessageContaining("modifiedPayload")
+                .hasMessageContaining("payloadPatch");
+        // An explicit null counts as set, as it does to the API.
+        ReplayDeliveryParams withNull = new ReplayDeliveryParams().modifiedPayload(null).payloadPatch(Map.of("b", 2));
+        assertThatThrownBy(() -> deliveries.replay("del_1", withNull)).isInstanceOf(HookbaseException.class);
+        assertThat(server.requests()).isEmpty();
+    }
+
+    @Test
+    void replayWithNoOrEmptyParamsSendsNoBody() {
+        server.enqueue(200, REPLAYED);
+        server.enqueue(200, REPLAYED);
+        deliveries.replay("del_1", (ReplayDeliveryParams) null);
+        deliveries.replay("del_1", new ReplayDeliveryParams());
+        assertThat(server.requests()).extracting(MockServer.Request::rawBody).allMatch(b -> b == null || b.isEmpty());
     }
 }
